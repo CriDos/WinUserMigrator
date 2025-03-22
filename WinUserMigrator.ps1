@@ -315,7 +315,7 @@ function CopyUserProfile {
     $targetUserProfile = "$TargetPath\$UserName"
     
     $isSourceSymLink = IsSymbolicLink -Path $sourceUserProfile
-    $isTargetSymLink = Test-Path $targetUserProfile && (IsSymbolicLink -Path $targetUserProfile)
+    $isTargetSymLink = (Test-Path $targetUserProfile) -and (IsSymbolicLink -Path $targetUserProfile)
     
     if ($isSourceSymLink) {
         $sourceTarget = (Get-Item $sourceUserProfile -Force).Target
