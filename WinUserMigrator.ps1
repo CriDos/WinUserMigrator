@@ -1,4 +1,5 @@
 ﻿$ErrorActionPreference = "Stop"
+$ScriptVersion = "1.0.0"
 
 $ScriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 $DateTime = Get-Date -Format 'yyyy-MM-dd_HHmmss'
@@ -39,7 +40,7 @@ function Show-Header {
     Write-Host $border
     
     $titleSpaces = [math]::Max(0, [math]::Floor(($width - $Title.Length) / 2))
-    Write-Host (" " * $titleSpaces + $Title)
+    Write-Host (" " * $titleSpaces + $Title + " v$ScriptVersion")
     
     if ($StepDescription -ne "") {
         Write-Host ""
