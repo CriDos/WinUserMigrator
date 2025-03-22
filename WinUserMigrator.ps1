@@ -417,7 +417,6 @@ function CopyUserProfile {
         }
     }
     
-    # If we chose option 2 (source renamed), skip the copy process
     if ($action -eq "2") {
         return "source_renamed"
     }
