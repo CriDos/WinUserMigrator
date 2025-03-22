@@ -1,0 +1,12 @@
+# Log files
+*.log
+
+# Windows System files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# PowerShell
+*.ps1.config
+*.psm1.config 
