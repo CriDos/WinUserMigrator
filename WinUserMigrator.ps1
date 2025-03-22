@@ -31,16 +31,17 @@ function Show-Header {
     
     Clear-Host
     
+    $titleWithVersion = "$Title v$ScriptVersion"
     $desc = if ($StepDescription -ne "") { "* $StepDescription *" } else { "" }
-    $maxLength = [math]::Max($Title.Length, $desc.Length)
+    $maxLength = [math]::Max($titleWithVersion.Length, $desc.Length)
     $width = $maxLength + 10
     
     $border = "=" * $width
     
     Write-Host $border
     
-    $titleSpaces = [math]::Max(0, [math]::Floor(($width - $Title.Length) / 2))
-    Write-Host (" " * $titleSpaces + $Title + " v$ScriptVersion")
+    $titleSpaces = [math]::Max(0, [math]::Floor(($width - $titleWithVersion.Length) / 2))
+    Write-Host (" " * $titleSpaces + $titleWithVersion)
     
     if ($StepDescription -ne "") {
         Write-Host ""
