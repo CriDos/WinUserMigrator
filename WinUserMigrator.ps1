@@ -766,11 +766,7 @@ function SwitchToAdminAccount {
     
     try {
         $adminAccount = Get-LocalUser -Name $adminName
-        
-        Write-LogAndConsole "Этот скрипт позволяет перенести профиль пользователя на другой диск"
-        Write-LogAndConsole "и создать символическую ссылку для бесшовной работы системы."
-        Write-Host ""
-        
+
         if ($adminAccount.Enabled) {
             Write-LogAndConsole "Учетная запись администратора ($adminName) включена"
             Write-Host "Вы можете деактивировать её для повышения безопасности системы."
@@ -790,6 +786,9 @@ function SwitchToAdminAccount {
         } else {
             Write-LogAndConsole "Учетная запись администратора ($adminName) отключена"
             Write-LogAndConsole "Для миграции профиля пользователя необходимо включить учетную запись администратора."
+            
+            # Автоматическое предложение включить учетную запись администратора
+            Write-LogAndConsole "Предлагаем автоматически включить учетную запись администратора для выполнения миграции."
             
             if ((Read-Host "`nВключить учетную запись администратора и выйти из системы? (д/н)").ToLower() -eq "д") {
                 if (ToggleUserAccount -Username $adminName -Action "Enable") {
@@ -896,10 +895,33 @@ function ShowUserMenu {
     while ($continue) {
         Show-Header -StepDescription "Главное меню (режим пользователя)"
         
+        Write-LogAndConsole "Этот скрипт позволяет перенести профиль пользователя на другой диск"
+        Write-LogAndConsole "и создать символическую ссылку для бесшовной работы системы."
+        Write-Host ""
+        
         Write-Host "Текущий пользователь: $env:USERNAME"
+        
+        # Проверка статуса учётной записи администратора
+        $adminName = GetBuiltInAdminName
+        try {
+            $adminAccount = Get-LocalUser -Name $adminName -ErrorAction Stop
+            $status = if ($adminAccount.Enabled) { "ВКЛЮЧЕНА" } else { "ОТКЛЮЧЕНА" }
+            
+            if ($adminAccount.Enabled) {
+                Write-LogAndConsole "Учетная запись администратора ($adminName): $status"
+                Write-LogAndConsole "Рекомендуется отключить её после использования для повышения безопасности."
+            } else {
+                Write-LogAndConsole "Внимание! Учетная запись администратора ($adminName): $status"
+                Write-LogAndConsole "Для миграции профиля НЕОБХОДИМО включить учетную запись администратора."
+                Write-LogAndConsole "Выберите пункт 2 для активации учетной записи администратора."
+            }
+        } catch {
+            Write-LogAndConsole "Не удалось проверить статус учетной записи администратора: $($_.Exception.Message)"
+        }
+        
         Write-Host ""
         Write-Host "1. Проверить состояние перенесенных профилей"
-        Write-Host "2. Перейти в режим администратора"
+        Write-Host "2. Управление учетной записью администратора"
         Write-Host "0. Выход"
         
         switch (Read-Host "`nВыберите действие (0-2)") {
