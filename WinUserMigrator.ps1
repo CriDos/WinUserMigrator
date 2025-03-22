@@ -314,19 +314,8 @@ function CopyUserProfile {
     $sourceUserProfile = "$UsersProfileRoot\$UserName"
     $targetUserProfile = "$TargetPath\$UserName"
     
-    if (-not (Test-Path $TargetPath)) {
-        Write-LogAndConsole "Создание папки $TargetPath"
-        try {
-            New-Item -Path $TargetPath -ItemType Directory -Force | Out-Null
-        } catch {
-            Write-LogAndConsole "ОШИБКА: Не удалось создать папку $TargetPath`: $($_.Exception.Message)"
-            Read-Host "Нажмите Enter, чтобы вернуться в главное меню"
-            return $null
-        }
-    }
-    
     $isSourceSymLink = IsSymbolicLink -Path $sourceUserProfile
-    $isTargetSymLink = IsSymbolicLink -Path $targetUserProfile
+    $isTargetSymLink = Test-Path $targetUserProfile && (IsSymbolicLink -Path $targetUserProfile)
     
     if ($isSourceSymLink) {
         $sourceTarget = (Get-Item $sourceUserProfile -Force).Target
@@ -344,7 +333,18 @@ function CopyUserProfile {
         return $null
     }
     
-    if (Test-Path $targetUserProfile -and -not $isTargetSymLink) {
+    if (-not (Test-Path $TargetPath)) {
+        Write-LogAndConsole "Создание папки $TargetPath"
+        try {
+            New-Item -Path $TargetPath -ItemType Directory -Force | Out-Null
+        } catch {
+            Write-LogAndConsole "ОШИБКА: Не удалось создать папку $TargetPath`: $($_.Exception.Message)"
+            Read-Host "Нажмите Enter, чтобы вернуться в главное меню"
+            return $null
+        }
+    }
+    
+    if (Test-Path $targetUserProfile) {
         Write-LogAndConsole "ВНИМАНИЕ: Профиль уже существует в целевом расположении: $targetUserProfile"
         Write-Host ""
         Write-Host "Выберите действие:"
