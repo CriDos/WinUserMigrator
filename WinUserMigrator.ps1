@@ -158,7 +158,7 @@ function SelectUserProfile {
     Write-Host "           ВЫБОР ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ"
     Write-Host "================================================"
     Write-Host ""
-    Write-LogAndConsole "Найдены следующие профили пользователей в C:\Users:"
+    Write-LogAndConsole "Найдены следующие профили пользователей"
     Write-Host ""
         
     for ($i = 0; $i -lt $usersWithProfiles.Count; $i++) {
@@ -231,7 +231,6 @@ function SelectTargetDrive {
         $totalGB = [math]::Round(($drive.Free + $drive.Used) / 1GB, 2)
         $percentFree = [math]::Round(($drive.Free / ($drive.Free + $drive.Used)) * 100, 1)
         Write-LogAndConsole "  $($i+1). Диск $($drive.Name): - Свободно $freeGB ГБ из $totalGB ГБ ($percentFree% свободно)"
-        Write-LogAndConsole "      ЦЕЛЕВОЙ путь будет: $($drive.Name):\Users"
     }
     
     Write-Host ""
@@ -814,20 +813,24 @@ function ShowUserMenu {
 
 if (-not (IsAdmin)) {
     Write-LogAndConsole "Для выполнения этого скрипта требуются права администратора!"
-    Write-LogAndConsole "Пожалуйста, перезапустите с правами администратора."
-    Read-Host "Нажмите Enter для выхода"
-    exit 1
+    Write-LogAndConsole "Выполняется автоматический перезапуск с правами администратора..."
+    
+    try {
+        $scriptPath = $MyInvocation.MyCommand.Definition
+        Start-Process -FilePath "powershell.exe" -ArgumentList "-ExecutionPolicy Bypass -File `"$scriptPath`"" -Verb RunAs
+    }
+    catch {
+        Write-LogAndConsole "Ошибка при попытке перезапуска с правами администратора: $($_.Exception.Message)"
+        Write-LogAndConsole "Пожалуйста, перезапустите скрипт вручную с правами администратора."
+        Read-Host "Нажмите Enter для выхода"
+    }
+    
+    exit
 }
 
 if (IsBuiltInAdmin) {
     ShowAdminMenu
 } else {
-    Write-Host ""
-    Write-LogAndConsole "ВНИМАНИЕ: Скрипт запущен не от имени встроенного администратора"
-    Write-LogAndConsole "Для полной функциональности рекомендуется запустить скрипт"
-    Write-LogAndConsole "от имени встроенной учетной записи администратора."
-    Write-Host ""
-    
     ShowUserMenu
 }
 
