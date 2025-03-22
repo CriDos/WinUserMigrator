@@ -1,5 +1,5 @@
 ﻿$ErrorActionPreference = "Stop"
-$ScriptVersion = "1.0.1"
+$ScriptVersion = "1.0.2"
 
 $ScriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 $DateTime = Get-Date -Format 'yyyy-MM-dd_HHmmss'
@@ -768,7 +768,7 @@ function SwitchToAdminAccount {
         $adminAccount = Get-LocalUser -Name $adminName
 
         if ($adminAccount.Enabled) {
-            Write-LogAndConsole "Учетная запись администратора ($adminName) включена"
+            Write-LogAndConsole "Учетная запись администратора: ВКЛЮЧЕНА"
             Write-Host "Вы можете деактивировать её для повышения безопасности системы."
             
             if ((Read-Host "`nОтключить учетную запись администратора? (д/н)").ToLower() -eq "д") {
@@ -784,7 +784,7 @@ function SwitchToAdminAccount {
             Read-Host "Нажмите Enter для выхода"
             exit
         } else {
-            Write-LogAndConsole "Учетная запись администратора ($adminName) отключена"
+            Write-LogAndConsole "Учетная запись администратора: ОТКЛЮЧЕНА"
             Write-LogAndConsole "Для миграции профиля пользователя необходимо включить учетную запись администратора."
             
             Write-LogAndConsole "Предлагаем автоматически включить учетную запись администратора для выполнения миграции."
@@ -906,10 +906,10 @@ function ShowUserMenu {
             $status = if ($adminAccount.Enabled) { "ВКЛЮЧЕНА" } else { "ОТКЛЮЧЕНА" }
             
             if ($adminAccount.Enabled) {
-                Write-LogAndConsole "Учетная запись администратора ($adminName): $status"
+                Write-LogAndConsole "Учетная запись администратора: $status"
                 Write-LogAndConsole "Рекомендуется отключить её после использования для повышения безопасности."
             } else {
-                Write-LogAndConsole "Внимание! Учетная запись администратора ($adminName): $status"
+                Write-LogAndConsole "Учетная запись администратора: $status"
                 Write-LogAndConsole "Для миграции профиля НЕОБХОДИМО включить учетную запись администратора."
                 Write-LogAndConsole "Выберите пункт 2 для активации учетной записи администратора."
             }
