@@ -5,7 +5,7 @@ $DateTime = Get-Date -Format 'yyyy-MM-dd_HHmmss'
 $LogFile = "$ScriptPath\MoveUserProfile_$DateTime.log"
 
 "========================================" | Out-File -FilePath $LogFile -Encoding utf8
-"Script started: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File -FilePath $LogFile -Append -Encoding utf8
+"Скрипт запущен: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File -FilePath $LogFile -Append -Encoding utf8
 "========================================" | Out-File -FilePath $LogFile -Append -Encoding utf8
 
 function Write-LogAndConsole {
@@ -29,7 +29,7 @@ function GetBuiltInAdminName {
         $adminAccount = Get-LocalUser | Where-Object { $_.SID.Value -match "-500$" }
         return $adminAccount.Name
     } catch {
-        Write-LogAndConsole "Error getting built-in Administrator account name: $($_.Exception.Message)"
+        Write-LogAndConsole "Ошибка получения имени встроенной учетной записи администратора: $($_.Exception.Message)"
         return "Administrator"
     }
 }
@@ -41,22 +41,22 @@ function ToggleUserAccount {
         [string]$Action = "Enable"
     )
     
-    $actionText = if ($Action -eq "Enable") { "Enabling" } else { "Disabling" }
+    $actionText = if ($Action -eq "Enable") { "Включение" } else { "Отключение" }
     $cmdlet = if ($Action -eq "Enable") { "Enable-LocalUser" } else { "Disable-LocalUser" }
     
-    Write-LogAndConsole "$actionText user account $Username..."
+    Write-LogAndConsole "$actionText учетной записи пользователя $Username..."
     
     try {
         & $cmdlet -Name $Username
-        Write-LogAndConsole "User account $Username successfully $($Action.ToLower())d"
+        Write-LogAndConsole "Учетная запись пользователя $Username успешно $(if ($Action -eq "Enable") { "включена" } else { "отключена" })"
         return $true
     } catch {
-        Write-LogAndConsole "ERROR when $($actionText.ToLower()) user account $Username`: $($_.Exception.Message)"
+        Write-LogAndConsole "ОШИБКА при $($actionText.ToLower()) учетной записи пользователя $Username`: $($_.Exception.Message)"
         try {
             Start-Process -FilePath "powershell.exe" -ArgumentList "-Command $cmdlet -Name `"$Username`"" -Verb RunAs -Wait
             return $true
         } catch {
-            Write-LogAndConsole "Failed to execute command with elevated privileges: $($_.Exception.Message)"
+            Write-LogAndConsole "Не удалось выполнить команду с повышенными привилегиями: $($_.Exception.Message)"
             return $false
         }
     }
@@ -77,18 +77,18 @@ function GetNonSystemUsers {
 function ShowUserAccounts {
     $allUsers = GetNonSystemUsers
     
-    Write-LogAndConsole "List of user accounts:"
+    Write-LogAndConsole "Список учетных записей пользователей:"
     
     for ($i = 0; $i -lt $allUsers.Count; $i++) {
-        $status = if ($allUsers[$i].Enabled) { "Active" } else { "Inactive" }
-        Write-LogAndConsole "  $($i+1). $($allUsers[$i].Name) - Status: $status"
+        $status = if ($allUsers[$i].Enabled) { "Активна" } else { "Неактивна" }
+        Write-LogAndConsole "  $($i+1). $($allUsers[$i].Name) - Статус: $status"
     }
     
     $selectedIndex = 0
     do {
         Write-Host ""
-        Write-Host "0. Return to main menu"
-        $input = Read-Host "Select user account number to manage (0-$($allUsers.Count))"
+        Write-Host "0. Вернуться в главное меню"
+        $input = Read-Host "Выберите номер учетной записи для управления (0-$($allUsers.Count))"
         
         if ($input -eq "0") {
             return $null
@@ -107,7 +107,7 @@ function ShowUserAccounts {
 
 function ManageUserAccount {
     Write-Host ""
-    Write-LogAndConsole "*** User Account Management ***"
+    Write-LogAndConsole "*** Управление учетными записями пользователей ***"
     
     $selectedUser = ShowUserAccounts
     if ($selectedUser -eq $null) {
@@ -117,21 +117,21 @@ function ManageUserAccount {
     $currentStatus = $selectedUser.Enabled
     
     Write-Host ""
-    Write-Host "Account: $($selectedUser.Name)"
-    Write-Host "Current status: $(if ($currentStatus) { 'Active' } else { 'Inactive' })"
+    Write-Host "Учетная запись: $($selectedUser.Name)"
+    Write-Host "Текущий статус: $(if ($currentStatus) { 'Активна' } else { 'Неактивна' })"
     Write-Host ""
-    Write-Host "Select action:"
-    Write-Host "1. $(if ($currentStatus) { 'Disable' } else { 'Enable' }) account"
-    Write-Host "0. Return back"
+    Write-Host "Выберите действие:"
+    Write-Host "1. $(if ($currentStatus) { 'Отключить' } else { 'Включить' }) учетную запись"
+    Write-Host "0. Вернуться назад"
     
-    $action = Read-Host "Your choice (0-1)"
+    $action = Read-Host "Ваш выбор (0-1)"
     
     if ($action -eq "1") {
         $toggleAction = if ($currentStatus) { "Disable" } else { "Enable" }
         $result = ToggleUserAccount -Username $selectedUser.Name -Action $toggleAction
         
         if ($result) {
-            Write-LogAndConsole "User account $($selectedUser.Name) successfully $(if ($currentStatus) { 'disabled' } else { 'enabled' })"
+            Write-LogAndConsole "Учетная запись пользователя $($selectedUser.Name) успешно $(if ($currentStatus) { 'отключена' } else { 'включена' })"
         }
     }
 }
@@ -148,44 +148,44 @@ function SelectUserProfile {
     }
     
     if ($usersWithProfiles.Count -eq 0) {
-        Write-LogAndConsole "ERROR: No available user profiles found for migration!"
-        Read-Host "Press Enter to return to main menu"
+        Write-LogAndConsole "ОШИБКА: Не найдено доступных профилей пользователей для миграции!"
+        Read-Host "Нажмите Enter, чтобы вернуться в главное меню"
         return $null
     }
     
     Clear-Host
     Write-Host "================================================"
-    Write-Host "           USER PROFILE SELECTION"
+    Write-Host "           ВЫБОР ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ"
     Write-Host "================================================"
     Write-Host ""
-    Write-LogAndConsole "Found the following user profiles in C:\Users:"
+    Write-LogAndConsole "Найдены следующие профили пользователей в C:\Users:"
     Write-Host ""
         
     for ($i = 0; $i -lt $usersWithProfiles.Count; $i++) {
         $userProPath = "C:\Users\$($usersWithProfiles[$i])"
         $userProSize = "{0:N2} MB" -f ((Get-ChildItem -Path $userProPath -Recurse -Force -ErrorAction SilentlyContinue | 
                                         Measure-Object -Property Length -Sum).Sum / 1MB)
-        Write-LogAndConsole "  $($i+1). $($usersWithProfiles[$i]) - size: $userProSize (SOURCE: $userProPath)"
+        Write-LogAndConsole "  $($i+1). $($usersWithProfiles[$i]) - размер: $userProSize (ИСТОЧНИК: $userProPath)"
     }
     
     Write-Host ""
     
     if ($usersWithProfiles.Count -eq 1) {
-        $confirmSelect = Read-Host "Only one user profile found. Use it for migration? (y/n)"
+        $confirmSelect = Read-Host "Найден только один профиль пользователя. Использовать его для миграции? (д/н)"
         
-        if ($confirmSelect.ToLower() -eq "y") {
-            Write-LogAndConsole "Selected SOURCE user profile: C:\Users\$($usersWithProfiles[0])"
+        if ($confirmSelect.ToLower() -eq "д") {
+            Write-LogAndConsole "Выбран ИСХОДНЫЙ профиль пользователя: C:\Users\$($usersWithProfiles[0])"
             return $usersWithProfiles[0]
         } else {
-            Write-LogAndConsole "Profile selection canceled"
+            Write-LogAndConsole "Выбор профиля отменен"
             return $null
         }
     } 
     else {
         $selectedIndex = 0
         do {
-            Write-Host "0. Return to main menu"
-            $input = Read-Host "Enter profile number for migration (1-$($usersWithProfiles.Count)) or 0 to cancel"
+            Write-Host "0. Вернуться в главное меню"
+            $input = Read-Host "Введите номер профиля для миграции (1-$($usersWithProfiles.Count)) или 0 для отмены"
             
             if ($input -eq "0") {
                 return $null
@@ -199,7 +199,7 @@ function SelectUserProfile {
         } while ($selectedIndex -lt 1 -or $selectedIndex -gt $usersWithProfiles.Count)
         
         $selectedUser = $usersWithProfiles[$selectedIndex - 1]
-        Write-LogAndConsole "Selected SOURCE user profile: C:\Users\$selectedUser"
+        Write-LogAndConsole "Выбран ИСХОДНЫЙ профиль пользователя: C:\Users\$selectedUser"
         return $selectedUser
     }
 }
@@ -207,22 +207,22 @@ function SelectUserProfile {
 function SelectTargetDrive {
     Clear-Host
     Write-Host "================================================"
-    Write-Host "              TARGET DRIVE SELECTION"
+    Write-Host "              ВЫБОР ЦЕЛЕВОГО ДИСКА"
     Write-Host "================================================"
     Write-Host ""
-    Write-LogAndConsole "Select the drive where the user profile will be migrated to"
-    Write-LogAndConsole "SOURCE profile will remain at C:\Users\{username} as a symbolic link"
+    Write-LogAndConsole "Выберите диск, на который будет перенесен профиль пользователя"
+    Write-LogAndConsole "ИСХОДНЫЙ профиль останется в C:\Users\{имя пользователя} в виде символической ссылки"
     Write-Host ""
     
     $drives = Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Name -ne "C" -and $_.Free -gt 0 }
     
     if ($drives.Count -eq 0) {
-        Write-LogAndConsole "ERROR: No available drives found other than the system drive (C:)!"
-        Read-Host "Press Enter to return to main menu"
+        Write-LogAndConsole "ОШИБКА: Не найдено доступных дисков, кроме системного диска (C:)!"
+        Read-Host "Нажмите Enter, чтобы вернуться в главное меню"
         return $null
     }
     
-    Write-LogAndConsole "Available TARGET drives:"
+    Write-LogAndConsole "Доступные ЦЕЛЕВЫЕ диски:"
     Write-Host ""
     
     for ($i = 0; $i -lt $drives.Count; $i++) {
@@ -230,30 +230,30 @@ function SelectTargetDrive {
         $freeGB = [math]::Round($drive.Free / 1GB, 2)
         $totalGB = [math]::Round(($drive.Free + $drive.Used) / 1GB, 2)
         $percentFree = [math]::Round(($drive.Free / ($drive.Free + $drive.Used)) * 100, 1)
-        Write-LogAndConsole "  $($i+1). Drive $($drive.Name): - Free $freeGB GB of $totalGB GB ($percentFree% free)"
-        Write-LogAndConsole "      TARGET path would be: $($drive.Name):\Users"
+        Write-LogAndConsole "  $($i+1). Диск $($drive.Name): - Свободно $freeGB ГБ из $totalGB ГБ ($percentFree% свободно)"
+        Write-LogAndConsole "      ЦЕЛЕВОЙ путь будет: $($drive.Name):\Users"
     }
     
     Write-Host ""
     
     if ($drives.Count -eq 1) {
-        $confirmSelect = Read-Host "Only one available drive found. Use it for migration? (y/n)"
+        $confirmSelect = Read-Host "Найден только один доступный диск. Использовать его для миграции? (д/н)"
         
-        if ($confirmSelect.ToLower() -eq "y") {
+        if ($confirmSelect.ToLower() -eq "д") {
             $selectedDrive = $drives[0]
             $targetPath = "$($selectedDrive.Name):\Users"
-            Write-LogAndConsole "Selected TARGET drive: $($selectedDrive.Name): - Target folder: $targetPath"
+            Write-LogAndConsole "Выбран ЦЕЛЕВОЙ диск: $($selectedDrive.Name): - Целевая папка: $targetPath"
             return $targetPath
         } else {
-            Write-LogAndConsole "Drive selection canceled"
+            Write-LogAndConsole "Выбор диска отменен"
             return $null
         }
     } 
     else {
         $selection = 0
         do {
-            Write-Host "0. Return to main menu"
-            $input = Read-Host "Enter drive number for profile migration (1-$($drives.Count)) or 0 to cancel"
+            Write-Host "0. Вернуться в главное меню"
+            $input = Read-Host "Введите номер диска для миграции профиля (1-$($drives.Count)) или 0 для отмены"
             
             if ($input -eq "0") {
                 return $null
@@ -269,7 +269,7 @@ function SelectTargetDrive {
         $selectedDrive = $drives[$selection - 1]
         $targetPath = "$($selectedDrive.Name):\Users"
         
-        Write-LogAndConsole "Selected TARGET drive: $($selectedDrive.Name): - Target folder: $targetPath"
+        Write-LogAndConsole "Выбран ЦЕЛЕВОЙ диск: $($selectedDrive.Name): - Целевая папка: $targetPath"
         return $targetPath
     }
 }
@@ -282,56 +282,56 @@ function CopyUserProfile {
     
     Clear-Host
     Write-Host "================================================"
-    Write-Host "           USER PROFILE COPYING"
+    Write-Host "           КОПИРОВАНИЕ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ"
     Write-Host "================================================"
     Write-Host ""
-    Write-LogAndConsole "*** Step 3: Copying user profile ***"
+    Write-LogAndConsole "*** Шаг 3: Копирование профиля пользователя ***"
     
     $sourceUserProfile = "C:\Users\$UserName"
     $targetUserProfile = "$TargetPath\$UserName"
     
     if (-not (Test-Path $TargetPath)) {
-        Write-LogAndConsole "Creating folder $TargetPath"
+        Write-LogAndConsole "Создание папки $TargetPath"
         try {
             New-Item -Path $TargetPath -ItemType Directory -Force | Out-Null
         } catch {
-            Write-LogAndConsole "ERROR: Failed to create folder $TargetPath`: $($_.Exception.Message)"
-            Read-Host "Press Enter to return to main menu"
+            Write-LogAndConsole "ОШИБКА: Не удалось создать папку $TargetPath`: $($_.Exception.Message)"
+            Read-Host "Нажмите Enter, чтобы вернуться в главное меню"
             return $null
         }
     }
     
     if (Test-Path $targetUserProfile) {
-        Write-LogAndConsole "WARNING: Profile already exists at target location: $targetUserProfile"
+        Write-LogAndConsole "ВНИМАНИЕ: Профиль уже существует в целевом расположении: $targetUserProfile"
         Write-Host ""
-        Write-Host "Select action:"
-        Write-Host "1. Rename target profile '$targetUserProfile' to '${targetUserProfile}_old' and proceed with migration"
-        Write-Host "2. Rename source profile 'C:\Users\$UserName' to 'C:\Users\${UserName}_old' and use target profile"
-        Write-Host "3. Replace existing profile on target drive '$targetUserProfile'"
-        Write-Host "0. Return to main menu"
+        Write-Host "Выберите действие:"
+        Write-Host "1. Переименовать целевой профиль '$targetUserProfile' в '${targetUserProfile}_old' и продолжить миграцию"
+        Write-Host "2. Переименовать исходный профиль 'C:\Users\$UserName' в 'C:\Users\${UserName}_old' и использовать целевой профиль"
+        Write-Host "3. Заменить существующий профиль на целевом диске '$targetUserProfile'"
+        Write-Host "0. Вернуться в главное меню"
         
-        $action = Read-Host "Your choice (0-3)"
+        $action = Read-Host "Ваш выбор (0-3)"
         
         if ($action -eq "0") {
             return $null
         } elseif ($action -eq "3") {
-            Write-LogAndConsole "Replacing existing profile on target drive: $targetUserProfile"
+            Write-LogAndConsole "Замена существующего профиля на целевом диске: $targetUserProfile"
             try {
                 Remove-Item -Path $targetUserProfile -Force -Recurse
-                Write-LogAndConsole "Existing profile on target drive deleted"
+                Write-LogAndConsole "Существующий профиль на целевом диске удален"
             } catch {
-                Write-LogAndConsole "ERROR when deleting existing profile on target drive: $($_.Exception.Message)"
+                Write-LogAndConsole "ОШИБКА при удалении существующего профиля на целевом диске: $($_.Exception.Message)"
                 
-                Write-Host "1. Continue despite errors"
-                Write-Host "0. Return to main menu"
+                Write-Host "1. Продолжить, несмотря на ошибки"
+                Write-Host "0. Вернуться в главное меню"
                 
-                $continueOption = Read-Host "Your choice (0-1)"
+                $continueOption = Read-Host "Ваш выбор (0-1)"
                 if ($continueOption -ne "1") {
                     return $null
                 }
             }
         } elseif ($action -eq "2") {
-            Write-LogAndConsole "Renaming source profile (C:\Users\$UserName) and using existing target profile ($targetUserProfile)"
+            Write-LogAndConsole "Переименование исходного профиля (C:\Users\$UserName) и использование существующего целевого профиля ($targetUserProfile)"
             
             $oldSourceProfile = "${sourceUserProfile}_old"
             if (Test-Path $oldSourceProfile) {
@@ -340,55 +340,55 @@ function CopyUserProfile {
             }
             
             try {
-                Write-LogAndConsole "Renaming source profile C:\Users\$UserName to $oldSourceProfile"
+                Write-LogAndConsole "Переименование исходного профиля C:\Users\$UserName в $oldSourceProfile"
                 Rename-Item -Path $sourceUserProfile -NewName $oldSourceProfile -Force
                 
-                Write-LogAndConsole "Creating symbolic link from C:\Users\$UserName to target profile $targetUserProfile"
+                Write-LogAndConsole "Создание символической ссылки из C:\Users\$UserName на целевой профиль $targetUserProfile"
                 cmd /c mklink /d "$sourceUserProfile" "$targetUserProfile"
                 
                 if (Test-Path $sourceUserProfile) {
                     $linkItem = Get-Item $sourceUserProfile -Force
                     if ($linkItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
-                        Write-LogAndConsole "Symbolic link created successfully from C:\Users\$UserName to $targetUserProfile"
+                        Write-LogAndConsole "Символическая ссылка успешно создана из C:\Users\$UserName в $targetUserProfile"
                         return "source_renamed"
                     } else {
-                        Write-LogAndConsole "ERROR: Failed to create symbolic link"
+                        Write-LogAndConsole "ОШИБКА: Не удалось создать символическую ссылку"
                         
                         try {
-                            Write-LogAndConsole "Restoring original source profile"
+                            Write-LogAndConsole "Восстановление исходного профиля"
                             if (Test-Path $sourceUserProfile) {
                                 Remove-Item -Path $sourceUserProfile -Force -Recurse
                             }
                             Rename-Item -Path $oldSourceProfile -NewName $sourceUserProfile -Force
-                            Write-LogAndConsole "Original source profile (C:\Users\$UserName) restored"
+                            Write-LogAndConsole "Исходный профиль (C:\Users\$UserName) восстановлен"
                         } catch {
-                            Write-LogAndConsole "CRITICAL ERROR: Failed to restore original source profile: $($_.Exception.Message)"
+                            Write-LogAndConsole "КРИТИЧЕСКАЯ ОШИБКА: Не удалось восстановить исходный профиль: $($_.Exception.Message)"
                         }
                         
-                        Read-Host "Press Enter to return to main menu"
+                        Read-Host "Нажмите Enter, чтобы вернуться в главное меню"
                         return $null
                     }
                 } else {
-                    Write-LogAndConsole "ERROR: Failed to create symbolic link"
+                    Write-LogAndConsole "ОШИБКА: Не удалось создать символическую ссылку"
                     
                     try {
-                        Write-LogAndConsole "Restoring original source profile"
+                        Write-LogAndConsole "Восстановление исходного профиля"
                         Rename-Item -Path $oldSourceProfile -NewName $sourceUserProfile -Force
-                        Write-LogAndConsole "Original source profile (C:\Users\$UserName) restored"
+                        Write-LogAndConsole "Исходный профиль (C:\Users\$UserName) восстановлен"
                     } catch {
-                        Write-LogAndConsole "CRITICAL ERROR: Failed to restore original source profile: $($_.Exception.Message)"
+                        Write-LogAndConsole "КРИТИЧЕСКАЯ ОШИБКА: Не удалось восстановить исходный профиль: $($_.Exception.Message)"
                     }
                     
-                    Read-Host "Press Enter to return to main menu"
+                    Read-Host "Нажмите Enter, чтобы вернуться в главное меню"
                     return $null
                 }
             } catch {
-                Write-LogAndConsole "ERROR when renaming source profile: $($_.Exception.Message)"
-                Read-Host "Press Enter to return to main menu"
+                Write-LogAndConsole "ОШИБКА при переименовании исходного профиля: $($_.Exception.Message)"
+                Read-Host "Нажмите Enter, чтобы вернуться в главное меню"
                 return $null
             }
         } elseif ($action -eq "1") {
-            Write-LogAndConsole "Renaming target profile and proceeding with migration"
+            Write-LogAndConsole "Переименование целевого профиля и продолжение миграции"
             
             $oldTargetProfile = "${targetUserProfile}_old"
             if (Test-Path $oldTargetProfile) {
@@ -397,22 +397,22 @@ function CopyUserProfile {
             }
             
             try {
-                Write-LogAndConsole "Renaming target profile $targetUserProfile to $oldTargetProfile"
+                Write-LogAndConsole "Переименование целевого профиля $targetUserProfile в $oldTargetProfile"
                 Rename-Item -Path $targetUserProfile -NewName $oldTargetProfile -Force
-                Write-LogAndConsole "Target profile renamed successfully"
+                Write-LogAndConsole "Целевой профиль успешно переименован"
             } catch {
-                Write-LogAndConsole "ERROR when renaming target profile: $($_.Exception.Message)"
+                Write-LogAndConsole "ОШИБКА при переименовании целевого профиля: $($_.Exception.Message)"
                 
-                Write-Host "1. Continue despite errors"
-                Write-Host "0. Return to main menu"
+                Write-Host "1. Продолжить, несмотря на ошибки"
+                Write-Host "0. Вернуться в главное меню"
                 
-                $continueOption = Read-Host "Your choice (0-1)"
+                $continueOption = Read-Host "Ваш выбор (0-1)"
                 if ($continueOption -ne "1") {
                     return $null
                 }
             }
         } else {
-            Write-LogAndConsole "Invalid input. Returning to main menu."
+            Write-LogAndConsole "Некорректный ввод. Возврат в главное меню."
             return $null
         }
     }
@@ -421,34 +421,34 @@ function CopyUserProfile {
         return "source_renamed"
     }
     
-    Write-LogAndConsole "Copying user profile from SOURCE (C:\Users\$UserName) to TARGET ($targetUserProfile)"
+    Write-LogAndConsole "Копирование профиля пользователя из ИСТОЧНИКА (C:\Users\$UserName) в ЦЕЛЕВОЙ каталог ($targetUserProfile)"
     
     if (-not (Test-Path $targetUserProfile)) {
         try {
             New-Item -Path $targetUserProfile -ItemType Directory -Force | Out-Null
         } catch {
-            Write-LogAndConsole "ERROR: Failed to create target folder $targetUserProfile`: $($_.Exception.Message)"
-            Read-Host "Press Enter to return to main menu"
+            Write-LogAndConsole "ОШИБКА: Не удалось создать целевую папку $targetUserProfile`: $($_.Exception.Message)"
+            Read-Host "Нажмите Enter, чтобы вернуться в главное меню"
             return $null
         }
     }
     
     try {
         $robocopyArgs = "`"$sourceUserProfile`" `"$targetUserProfile`" /E /COPYALL /DCOPY:T /R:1 /W:1 /XJ"
-        Write-LogAndConsole "Executing command: robocopy $robocopyArgs"
+        Write-LogAndConsole "Выполнение команды: robocopy $robocopyArgs"
         
         $robocopyProcess = Start-Process -FilePath "robocopy" -ArgumentList $robocopyArgs -NoNewWindow -Wait -PassThru
         
         if ($robocopyProcess.ExitCode -lt 8) {
-            Write-LogAndConsole "Profile copying from SOURCE (C:\Users\$UserName) to TARGET ($targetUserProfile) completed successfully"
+            Write-LogAndConsole "Копирование профиля из ИСТОЧНИКА (C:\Users\$UserName) в ЦЕЛЕВОЙ каталог ($targetUserProfile) успешно завершено"
             return "success"
         } else {
-            Write-LogAndConsole "WARNING: Copying process completed with errors (code $($robocopyProcess.ExitCode))"
+            Write-LogAndConsole "ВНИМАНИЕ: Процесс копирования завершен с ошибками (код $($robocopyProcess.ExitCode))"
             
-            Write-Host "1. Continue despite errors"
-            Write-Host "0. Return to main menu"
+            Write-Host "1. Продолжить, несмотря на ошибки"
+            Write-Host "0. Вернуться в главное меню"
             
-            $continueOption = Read-Host "Your choice (0-1)"
+            $continueOption = Read-Host "Ваш выбор (0-1)"
             if ($continueOption -ne "1") {
                 return $null
             }
@@ -456,12 +456,12 @@ function CopyUserProfile {
             return "errors"
         }
     } catch {
-        Write-LogAndConsole "ERROR when copying profile: $($_.Exception.Message)"
+        Write-LogAndConsole "ОШИБКА при копировании профиля: $($_.Exception.Message)"
         
-        Write-Host "1. Continue despite errors"
-        Write-Host "0. Return to main menu"
+        Write-Host "1. Продолжить, несмотря на ошибки"
+        Write-Host "0. Вернуться в главное меню"
         
-        $continueOption = Read-Host "Your choice (0-1)"
+        $continueOption = Read-Host "Ваш выбор (0-1)"
         if ($continueOption -ne "1") {
             return $null
         }
@@ -478,16 +478,16 @@ function CreateSymbolicLink {
     )
     
     if ($CopyStatus -eq "source_renamed") {
-        Write-LogAndConsole "Skipping symbolic link creation (source profile already renamed and linked)"
+        Write-LogAndConsole "Пропуск создания символической ссылки (исходный профиль уже переименован и связан)"
         return $true
     }
     
     Clear-Host
     Write-Host "================================================"
-    Write-Host "           SYMBOLIC LINK CREATION"
+    Write-Host "           СОЗДАНИЕ СИМВОЛИЧЕСКОЙ ССЫЛКИ"
     Write-Host "================================================"
     Write-Host ""
-    Write-LogAndConsole "*** Step 4: Creating symbolic link for user profile ***"
+    Write-LogAndConsole "*** Шаг 4: Создание символической ссылки для профиля пользователя ***"
     
     $sourceUserProfile = "C:\Users\$UserName"
     $targetUserProfile = "$TargetPath\$UserName"
@@ -498,16 +498,16 @@ function CreateSymbolicLink {
             $backupDir = "C:\Users\${UserName}_backup_$timestamp"
             
             try {
-                Write-LogAndConsole "Renaming source profile from C:\Users\$UserName to $backupDir"
+                Write-LogAndConsole "Переименование исходного профиля из C:\Users\$UserName в $backupDir"
                 Rename-Item -Path $sourceUserProfile -NewName $backupDir -Force
             } catch {
-                Write-LogAndConsole "ERROR when renaming source profile: $($_.Exception.Message)"
-                Write-LogAndConsole "Attempting direct folder deletion..."
+                Write-LogAndConsole "ОШИБКА при переименовании исходного профиля: $($_.Exception.Message)"
+                Write-LogAndConsole "Попытка прямого удаления папки..."
                 
                 try {
                     Remove-Item -Path $sourceUserProfile -Force -Recurse
                 } catch {
-                    Write-LogAndConsole "ERROR when deleting source profile (C:\Users\$UserName): $($_.Exception.Message)"
+                    Write-LogAndConsole "ОШИБКА при удалении исходного профиля (C:\Users\$UserName): $($_.Exception.Message)"
                     
                     if ((Test-Path $sourceUserProfile) -and 
                         ((Get-Item $sourceUserProfile -Force).Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
@@ -515,63 +515,63 @@ function CreateSymbolicLink {
                         try {
                             $linkTarget = (Get-Item $sourceUserProfile).Target
                             if ($linkTarget -eq $targetUserProfile) {
-                                Write-LogAndConsole "Existing symbolic link already points from SOURCE (C:\Users\$UserName) to TARGET ($targetUserProfile)"
+                                Write-LogAndConsole "Существующая символическая ссылка уже указывает из ИСТОЧНИКА (C:\Users\$UserName) на ЦЕЛЬ ($targetUserProfile)"
                                 return $true
                             } else {
-                                Write-LogAndConsole "Current link points to $linkTarget, deleting..."
+                                Write-LogAndConsole "Текущая ссылка указывает на $linkTarget, удаление..."
                                 Remove-Item -Path $sourceUserProfile -Force
                             }
                         } catch {
-                            Write-LogAndConsole "ERROR when working with existing link: $($_.Exception.Message)"
+                            Write-LogAndConsole "ОШИБКА при работе с существующей ссылкой: $($_.Exception.Message)"
                             
-                            Write-Host "0. Return to main menu"
-                            Read-Host "Press Enter to return"
+                            Write-Host "0. Вернуться в главное меню"
+                            Read-Host "Нажмите Enter для возврата"
                             return $false
                         }
                     } else {
-                        Write-LogAndConsole "Failed to delete or move the source profile folder (C:\Users\$UserName)"
+                        Write-LogAndConsole "Не удалось удалить или переместить папку исходного профиля (C:\Users\$UserName)"
                         
-                        Write-Host "0. Return to main menu"
-                        Read-Host "Press Enter to return"
+                        Write-Host "0. Вернуться в главное меню"
+                        Read-Host "Нажмите Enter для возврата"
                         return $false
                     }
                 }
             }
         }
         
-        Write-LogAndConsole "Creating symbolic link from SOURCE (C:\Users\$UserName) to TARGET ($targetUserProfile)"
+        Write-LogAndConsole "Создание символической ссылки из ИСТОЧНИКА (C:\Users\$UserName) на ЦЕЛЬ ($targetUserProfile)"
         cmd /c mklink /d "$sourceUserProfile" "$targetUserProfile"
         
         if (Test-Path $sourceUserProfile) {
-            Write-LogAndConsole "Symbolic link created successfully"
+            Write-LogAndConsole "Символическая ссылка успешно создана"
             
             $linkItem = Get-Item $sourceUserProfile -Force
             if ($linkItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
-                Write-LogAndConsole "Verification successful: C:\Users\$UserName is now a symbolic link to $targetUserProfile"
+                Write-LogAndConsole "Проверка успешна: C:\Users\$UserName теперь является символической ссылкой на $targetUserProfile"
             } else {
-                Write-LogAndConsole "WARNING: C:\Users\$UserName is not a symbolic link"
+                Write-LogAndConsole "ВНИМАНИЕ: C:\Users\$UserName не является символической ссылкой"
             }
             
             return $true
         } else {
-            Write-LogAndConsole "ERROR: Failed to create symbolic link"
+            Write-LogAndConsole "ОШИБКА: Не удалось создать символическую ссылку"
             
             if (Test-Path $backupDir) {
-                Write-LogAndConsole "Restoring from backup $backupDir to C:\Users\$UserName"
+                Write-LogAndConsole "Восстановление из резервной копии $backupDir в C:\Users\$UserName"
                 Rename-Item -Path $backupDir -NewName $sourceUserProfile -Force
             } else {
-                Write-LogAndConsole "CRITICAL ERROR: Source user profile deleted, but link not created!"
+                Write-LogAndConsole "КРИТИЧЕСКАЯ ОШИБКА: Исходный профиль пользователя удален, но ссылка не создана!"
             }
             
-            Write-Host "0. Return to main menu"
-            Read-Host "Press Enter to return"
+            Write-Host "0. Вернуться в главное меню"
+            Read-Host "Нажмите Enter для возврата"
             return $false
         }
     } catch {
-        Write-LogAndConsole "ERROR when creating symbolic link: $($_.Exception.Message)"
+        Write-LogAndConsole "ОШИБКА при создании символической ссылки: $($_.Exception.Message)"
         
-        Write-Host "0. Return to main menu"
-        Read-Host "Press Enter to return"
+        Write-Host "0. Вернуться в главное меню"
+        Read-Host "Нажмите Enter для возврата"
         return $false
     }
 }
@@ -584,45 +584,45 @@ function FinishOperation {
     
     Clear-Host
     Write-Host "================================================"
-    Write-Host "          PROFILE MIGRATION COMPLETION"
+    Write-Host "          ЗАВЕРШЕНИЕ МИГРАЦИИ ПРОФИЛЯ"
     Write-Host "================================================"
     Write-Host ""
     
-    Write-LogAndConsole "User profile migration for $UserName completed successfully"
-    Write-LogAndConsole "Original profile location: C:\Users\$UserName (now a symbolic link)"
-    Write-LogAndConsole "New physical profile location: $TargetPath\$UserName"
+    Write-LogAndConsole "Миграция профиля пользователя $UserName успешно завершена"
+    Write-LogAndConsole "Исходное расположение профиля: C:\Users\$UserName (теперь символическая ссылка)"
+    Write-LogAndConsole "Новое физическое расположение профиля: $TargetPath\$UserName"
     
     ToggleUserAccount -Username $UserName -Action "Enable"
     
     Write-Host ""
-    Write-Host "1. Restart computer now"
-    Write-Host "0. Return to main menu"
+    Write-Host "1. Перезагрузить компьютер сейчас"
+    Write-Host "0. Вернуться в главное меню"
     
-    $restart = Read-Host "Your choice (0-1)"
+    $restart = Read-Host "Ваш выбор (0-1)"
     
     if ($restart -eq "1") {
-        Write-LogAndConsole "Restarting computer..."
+        Write-LogAndConsole "Перезагрузка компьютера..."
         Restart-Computer -Force
     } else {
-        Write-LogAndConsole "Restart postponed. It is recommended to restart your computer as soon as possible."
-        Read-Host "Press Enter to return to main menu"
+        Write-LogAndConsole "Перезагрузка отложена. Рекомендуется перезагрузить компьютер как можно скорее."
+        Read-Host "Нажмите Enter, чтобы вернуться в главное меню"
     }
 }
 
 function MigrateUserProfile {
     Clear-Host
     Write-Host "================================================"
-    Write-Host "           USER PROFILE MIGRATION"
+    Write-Host "           МИГРАЦИЯ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ"
     Write-Host "================================================"
     Write-Host ""
     
-    Write-LogAndConsole "*** Step 1: User profile selection ***"
+    Write-LogAndConsole "*** Шаг 1: Выбор профиля пользователя ***"
     $userName = SelectUserProfile
     if ($userName -eq $null) {
         return
     }
     
-    Write-LogAndConsole "*** Step 2: Target drive selection ***"
+    Write-LogAndConsole "*** Шаг 2: Выбор целевого диска ***"
     $targetPath = SelectTargetDrive
     if ($targetPath -eq $null) {
         return
@@ -630,18 +630,18 @@ function MigrateUserProfile {
     
     Clear-Host
     Write-Host "================================================"
-    Write-Host "          MIGRATION CONFIRMATION"
+    Write-Host "          ПОДТВЕРЖДЕНИЕ МИГРАЦИИ"
     Write-Host "================================================"
     Write-Host ""
-    Write-LogAndConsole "Migration parameters:"
-    Write-LogAndConsole "- SOURCE profile: C:\Users\$userName"
-    Write-LogAndConsole "- TARGET location: $targetPath\$userName"
+    Write-LogAndConsole "Параметры миграции:"
+    Write-LogAndConsole "- ИСХОДНЫЙ профиль: C:\Users\$userName"
+    Write-LogAndConsole "- ЦЕЛЕВОЕ расположение: $targetPath\$userName"
     Write-Host ""
     
-    $confirm = Read-Host "Start profile migration? (y/n)"
-    if ($confirm.ToLower() -ne "y") {
-        Write-LogAndConsole "Migration canceled by user"
-        Read-Host "Press Enter to return to main menu"
+    $confirm = Read-Host "Начать миграцию профиля? (д/н)"
+    if ($confirm.ToLower() -ne "д") {
+        Write-LogAndConsole "Миграция отменена пользователем"
+        Read-Host "Нажмите Enter, чтобы вернуться в главное меню"
         return
     }
     
@@ -663,37 +663,37 @@ function ManageAdminAccount {
     
     try {
         $adminAccount = Get-LocalUser -Name $adminName
-        $status = if ($adminAccount.Enabled) { "Enabled" } else { "Disabled" }
+        $status = if ($adminAccount.Enabled) { "Включена" } else { "Отключена" }
         
         Write-Host ""
-        Write-LogAndConsole "Managing built-in Administrator account"
-        Write-LogAndConsole "Account name: $adminName"
-        Write-LogAndConsole "Current status: $status"
+        Write-LogAndConsole "Управление встроенной учетной записью администратора"
+        Write-LogAndConsole "Имя учетной записи: $adminName"
+        Write-LogAndConsole "Текущий статус: $status"
         
         Write-Host ""
-        Write-Host "1. $(if ($adminAccount.Enabled) { 'Disable' } else { 'Enable' }) Administrator account"
-        Write-Host "0. Return to main menu"
+        Write-Host "1. $(if ($adminAccount.Enabled) { 'Отключить' } else { 'Включить' }) учетную запись администратора"
+        Write-Host "0. Вернуться в главное меню"
         
-        $choice = Read-Host "Select action (0-1)"
+        $choice = Read-Host "Выберите действие (0-1)"
         
         if ($choice -eq "1") {
             $action = if ($adminAccount.Enabled) { "Disable" } else { "Enable" }
             $result = ToggleUserAccount -Username $adminName -Action $action
             
             if ($result) {
-                $actionText = if ($action -eq "Enable") { "enabled" } else { "disabled" }
-                Write-LogAndConsole "Administrator account successfully $actionText"
+                $actionText = if ($action -eq "Enable") { "включена" } else { "отключена" }
+                Write-LogAndConsole "Учетная запись администратора успешно $actionText"
             } else {
-                Write-LogAndConsole "Error changing Administrator account status"
+                Write-LogAndConsole "Ошибка изменения статуса учетной записи администратора"
             }
             
             Write-Host ""
-            Read-Host "Press Enter to return to menu"
+            Read-Host "Нажмите Enter для возврата в меню"
         }
     } catch {
-        Write-LogAndConsole "Error managing Administrator account: $($_.Exception.Message)"
+        Write-LogAndConsole "Ошибка управления учетной записью администратора: $($_.Exception.Message)"
         Write-Host ""
-        Read-Host "Press Enter to return to menu"
+        Read-Host "Нажмите Enter для возврата в меню"
     }
 }
 
@@ -705,75 +705,75 @@ function SwitchToAdminAccount {
         
         Write-Host ""
         Write-Host "================================================"
-        Write-Host "          WINDOWS USER PROFILE MIGRATION"
+        Write-Host "          МИГРАЦИЯ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ WINDOWS"
         Write-Host "================================================"
         Write-Host ""
-        Write-LogAndConsole "This script allows you to migrate a user profile to another drive"
-        Write-LogAndConsole "and create a symbolic link for seamless system operation."
+        Write-LogAndConsole "Этот скрипт позволяет перенести профиль пользователя на другой диск"
+        Write-LogAndConsole "и создать символическую ссылку для бесшовной работы системы."
         Write-Host ""
         
         if ($adminAccount.Enabled) {
-            Write-LogAndConsole "Administrator account ($adminName) is enabled"
-            Write-Host "You can deactivate it to improve system security."
+            Write-LogAndConsole "Учетная запись администратора ($adminName) включена"
+            Write-Host "Вы можете деактивировать её для повышения безопасности системы."
             Write-Host ""
             
-            $confirmDisable = Read-Host "Disable Administrator account? (y/n)"
+            $confirmDisable = Read-Host "Отключить учетную запись администратора? (д/н)"
             
-            if ($confirmDisable.ToLower() -eq "y") {
+            if ($confirmDisable.ToLower() -eq "д") {
                 $adminDisabled = ToggleUserAccount -Username $adminName -Action "Disable"
                 
                 if ($adminDisabled) {
-                    Write-LogAndConsole "Administrator account ($adminName) successfully disabled"
+                    Write-LogAndConsole "Учетная запись администратора ($adminName) успешно отключена"
                 } else {
-                    Write-LogAndConsole "Failed to disable Administrator account"
+                    Write-LogAndConsole "Не удалось отключить учетную запись администратора"
                 }
                 
-                Read-Host "Press Enter to exit"
+                Read-Host "Нажмите Enter для выхода"
                 exit
             } else {
-                Write-LogAndConsole "Operation canceled by user"
-                Read-Host "Press Enter to exit"
+                Write-LogAndConsole "Операция отменена пользователем"
+                Read-Host "Нажмите Enter для выхода"
                 exit
             }
         } else {
-            Write-LogAndConsole "Administrator account ($adminName) is disabled"
-            Write-LogAndConsole "Administrator account must be enabled to migrate user profile."
+            Write-LogAndConsole "Учетная запись администратора ($adminName) отключена"
+            Write-LogAndConsole "Для миграции профиля пользователя необходимо включить учетную запись администратора."
             Write-Host ""
             
-            $confirmEnable = Read-Host "Enable Administrator account and log off? (y/n)"
+            $confirmEnable = Read-Host "Включить учетную запись администратора и выйти из системы? (д/н)"
             
-            if ($confirmEnable.ToLower() -eq "y") {
+            if ($confirmEnable.ToLower() -eq "д") {
                 $adminEnabled = ToggleUserAccount -Username $adminName -Action "Enable"
                 
                 if ($adminEnabled) {
-                    Write-LogAndConsole "Administrator account ($adminName) successfully enabled"
+                    Write-LogAndConsole "Учетная запись администратора ($adminName) успешно включена"
                     
                     $currentUser = $env:USERNAME
-                    Write-LogAndConsole "Disabling current user account ($currentUser)..."
+                    Write-LogAndConsole "Отключение текущей учетной записи пользователя ($currentUser)..."
                     
                     $command = "Disable-LocalUser -Name '$currentUser'; logoff"
                     
                     $encodedCommand = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($command))
                     Start-Process -FilePath "powershell.exe" -ArgumentList "-EncodedCommand $encodedCommand" -WindowStyle Hidden
                     
-                    Write-LogAndConsole "Ending session..."
-                    Write-LogAndConsole "Log in with Administrator account and run the script again."
+                    Write-LogAndConsole "Завершение сеанса..."
+                    Write-LogAndConsole "Войдите с учетной записью администратора и запустите скрипт снова."
                     Start-Sleep -Seconds 2
                     exit
                 } else {
-                    Write-LogAndConsole "Failed to enable Administrator account"
-                    Read-Host "Press Enter to exit"
+                    Write-LogAndConsole "Не удалось включить учетную запись администратора"
+                    Read-Host "Нажмите Enter для выхода"
                     exit
                 }
             } else {
-                Write-LogAndConsole "Operation canceled by user"
-                Read-Host "Press Enter to exit"
+                Write-LogAndConsole "Операция отменена пользователем"
+                Read-Host "Нажмите Enter для выхода"
                 exit
             }
         }
     } catch {
-        Write-LogAndConsole "Error checking Administrator account status: $($_.Exception.Message)"
-        Read-Host "Press Enter to exit"
+        Write-LogAndConsole "Ошибка проверки статуса учетной записи администратора: $($_.Exception.Message)"
+        Read-Host "Нажмите Enter для выхода"
         exit
     }
 }
@@ -784,24 +784,24 @@ function ShowAdminMenu {
     while ($continue) {
         Clear-Host
         Write-Host "================================================"
-        Write-Host "          WINDOWS USER PROFILE MIGRATION"
+        Write-Host "          МИГРАЦИЯ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ WINDOWS"
         Write-Host "================================================"
         Write-Host ""
-        Write-Host "Current user: $env:USERNAME"
+        Write-Host "Текущий пользователь: $env:USERNAME"
         Write-Host ""
-        Write-Host "1. Start user profile migration"
-        Write-Host "2. Manage user accounts"
-        Write-Host "0. Exit"
+        Write-Host "1. Начать миграцию профиля пользователя"
+        Write-Host "2. Управление учетными записями пользователей"
+        Write-Host "0. Выход"
         Write-Host ""
         
-        $choice = Read-Host "Select action (0-2)"
+        $choice = Read-Host "Выберите действие (0-2)"
         
         switch ($choice) {
             "1" { MigrateUserProfile }
             "2" { ManageUserAccount }
             "0" { $continue = $false }
             default { 
-                Write-Host "Invalid input. Press Enter to continue..." 
+                Write-Host "Некорректный ввод. Нажмите Enter для продолжения..." 
                 Read-Host
             }
         }
@@ -813,9 +813,9 @@ function ShowUserMenu {
 }
 
 if (-not (IsAdmin)) {
-    Write-LogAndConsole "Administrator rights required to run this script!"
-    Write-LogAndConsole "Please restart with administrator privileges."
-    Read-Host "Press Enter to exit"
+    Write-LogAndConsole "Для выполнения этого скрипта требуются права администратора!"
+    Write-LogAndConsole "Пожалуйста, перезапустите с правами администратора."
+    Read-Host "Нажмите Enter для выхода"
     exit 1
 }
 
@@ -823,12 +823,12 @@ if (IsBuiltInAdmin) {
     ShowAdminMenu
 } else {
     Write-Host ""
-    Write-LogAndConsole "WARNING: Not running as built-in Administrator account"
-    Write-LogAndConsole "For full functionality, it is recommended to run the script"
-    Write-LogAndConsole "as the built-in administrator account."
+    Write-LogAndConsole "ВНИМАНИЕ: Скрипт запущен не от имени встроенного администратора"
+    Write-LogAndConsole "Для полной функциональности рекомендуется запустить скрипт"
+    Write-LogAndConsole "от имени встроенной учетной записи администратора."
     Write-Host ""
     
     ShowUserMenu
 }
 
-Write-LogAndConsole "Script completed." 
+Write-LogAndConsole "Скрипт завершен." 
