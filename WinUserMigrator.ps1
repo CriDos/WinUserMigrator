@@ -1,19 +1,13 @@
-# Скрипт для переноса папки профилей пользователей
-
-# Включение обработки ошибок
 $ErrorActionPreference = "Stop"
 
-# Настройка логирования
 $ScriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 $DateTime = Get-Date -Format 'yyyy-MM-dd_HHmmss'
 $LogFile = "$ScriptPath\MoveUserProfile_$DateTime.log"
 
-# Начало логирования
 "========================================" | Out-File -FilePath $LogFile -Encoding utf8
 "Запуск скрипта: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File -FilePath $LogFile -Append -Encoding utf8
 "========================================" | Out-File -FilePath $LogFile -Append -Encoding utf8
 
-# Функция для одновременного вывода в консоль и лог
 function Write-LogAndConsole {
     param(
         [string]$Message
@@ -22,7 +16,6 @@ function Write-LogAndConsole {
     Write-Host $Message
 }
 
-# Функция для принудительного выхода из системы
 function ForceLogout {
     param(
         [int]$Timeout = 3
@@ -30,15 +23,12 @@ function ForceLogout {
     
     Write-LogAndConsole "Выполняется выход из системы..."
     
-    # Выполняем команду выхода из системы
     Write-Host "Выполнение команды выхода..." -ForegroundColor Yellow
     & shutdown.exe /l /f
     
-    # Форсированный выход из скрипта
     exit
 }
 
-# Функция для активации/деактивации учетной записи пользователя
 function ToggleUserAccount {
     param(
         [string]$Username,
@@ -61,10 +51,8 @@ function ToggleUserAccount {
         Write-LogAndConsole ("ОШИБКА при $($actionRu.ToLower()) учетной записи $Username`: {0}" -f $_.Exception.Message)
         try {
             Start-Process -FilePath "powershell.exe" -ArgumentList "-Command $cmdlet -Name `"$Username`"" -Verb RunAs -Wait
-            # Проверяем успешность операции
             $userAccount = Get-LocalUser -Name $Username -ErrorAction SilentlyContinue
             if ($userAccount -ne $null -and $userAccount.Enabled -eq $stateCheck) {
-                # Не выводим сообщение второй раз, результат будет отображен в вызывающем коде
                 return $true
             } else {
                 Write-LogAndConsole "ВНИМАНИЕ: Не удалось подтвердить $($actionRu.ToLower()) учетной записи $Username"
@@ -83,7 +71,6 @@ function ToggleUserAccount {
     }
 }
 
-# Функция для предложения перезагрузки
 function OfferRestart {
     param(
         [string]$TargetPath
@@ -92,7 +79,6 @@ function OfferRestart {
     Write-LogAndConsole "Перенос профиля завершен."
     Write-LogAndConsole "Новое расположение профиля: $TargetPath"
     
-    # Активируем учетную запись пользователя
     $userToEnable = $Global:SelectedUserName
     ToggleUserAccount -Username $userToEnable -Action "Enable"
     
@@ -108,7 +94,6 @@ function OfferRestart {
     }
 }
 
-# Проверка прав администратора
 Write-LogAndConsole "Проверка прав администратора..."
 $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
@@ -119,43 +104,34 @@ if (-not $isAdmin) {
 }
 Write-LogAndConsole "Права администратора подтверждены"
 
-# Определение типа текущей учетной записи и проверка статуса учетной записи Администратор
-# Получаем данные из системы вместо хранения их в переменных
 $currentUserName = $env:USERNAME
 Write-LogAndConsole "Текущий пользователь: $currentUserName"
 
-# Функция для проверки, является ли текущая учетная запись встроенным администратором
 function IsBuiltInAdmin {
     $userName = $env:USERNAME
     return ($userName -eq "Administrator" -or $userName -eq "Администратор")
 }
 
-# Функция для получения имени встроенной учетной записи администратора
 function GetBuiltInAdminName {
-    # Проверка английской версии Administrator
     try {
         $adminEN = Get-LocalUser -Name "Administrator" -ErrorAction SilentlyContinue
         if ($adminEN -ne $null) {
             return "Administrator"
         }
     } catch {
-        # Ничего не делаем, продолжаем проверку
     }
     
-    # Проверка русской версии Администратор
     try {
         $adminRU = Get-LocalUser -Name "Администратор" -ErrorAction SilentlyContinue
         if ($adminRU -ne $null) {
             return "Администратор"
         }
     } catch {
-        # Ничего не делаем, продолжаем проверку
     }
     
     return $null
 }
 
-# Функция для проверки активации учетной записи Администратор
 function IsAdminAccountEnabled {
     param (
         [string]$AdminName
@@ -173,7 +149,6 @@ function IsAdminAccountEnabled {
     }
 }
 
-# Получаем имя встроенной учетной записи администратора 
 $adminName = GetBuiltInAdminName
 if ($adminName -eq $null) {
     Write-LogAndConsole "Встроенная учетная запись Administrator/Администратор не найдена в системе"
@@ -181,12 +156,9 @@ if ($adminName -eq $null) {
     $isAdminEnabled = IsAdminAccountEnabled -AdminName $adminName
     $isRunningAsBuiltInAdmin = IsBuiltInAdmin
     
-    # Разные сценарии в зависимости от учетной записи, под которой запущен скрипт
     if ($isRunningAsBuiltInAdmin) {
-        # Скрипт запущен под учетной записью Администратор
         Write-LogAndConsole "Запуск под учетной записью $adminName"
         
-        # Предложение активировать пользовательские учетные записи
         Write-Host ""
         Write-Host "Выберите действие:"
         Write-Host "1. Активировать/деактивировать учетную запись пользователя"
@@ -195,7 +167,6 @@ if ($adminName -eq $null) {
         $adminChoice = Read-Host "Выберите действие (1-2)"
         
         if ($adminChoice -eq "1") {
-            # Получаем список всех локальных пользователей, кроме системных
             $allAccounts = Get-LocalUser | Where-Object { 
                 $_.Name -ne "Administrator" -and 
                 $_.Name -ne "Администратор" -and 
@@ -252,7 +223,6 @@ if ($adminName -eq $null) {
                 }
             }
             
-            # Предлагаем вернуться к основному меню или выйти
             Write-Host ""
             $continueScript = Read-Host "Продолжить работу со скриптом? (y/n)"
             if ($continueScript -ne "y") {
@@ -264,10 +234,8 @@ if ($adminName -eq $null) {
             Write-LogAndConsole "Продолжение работы скрипта"
         }
         
-        # Определяем, какую учетную запись будем переносить
         $usersToMove = @()
         
-        # Получаем список всех локальных пользователей, кроме системных
         $allUsers = Get-LocalUser | Where-Object { 
             $_.Name -ne "Administrator" -and 
             $_.Name -ne "Администратор" -and 
@@ -278,7 +246,6 @@ if ($adminName -eq $null) {
         }
         
         foreach ($user in $allUsers) {
-            # Проверяем существование профиля
             $userProfilePath = "C:\Users\$($user.Name)"
             if (Test-Path $userProfilePath) {
                 $usersToMove += $user.Name
@@ -297,7 +264,6 @@ if ($adminName -eq $null) {
         
         Write-Host ""
         
-        # Выбор учетной записи для переноса
         $selectedUserIndex = 0
         
         if ($usersToMove.Count -eq 0) {
@@ -320,7 +286,6 @@ if ($adminName -eq $null) {
             Write-LogAndConsole "Выбран профиль пользователя: $selectedUserName"
         }
         
-        # Запрос на начало переноса
         $startMove = Read-Host "Начать перенос профиля пользователя $selectedUserName? (y/n)"
         if ($startMove -ne "y") {
             Write-LogAndConsole "Операция отменена пользователем"
@@ -329,10 +294,8 @@ if ($adminName -eq $null) {
         
         Write-LogAndConsole "Начинаем процесс переноса профиля..."
         
-        # Сохраняем выбранного пользователя для дальнейшего использования
         $Global:SelectedUserName = $selectedUserName
     } else {
-        # Скрипт запущен под обычной учетной записью пользователя
         if ($isAdminEnabled) {
             Write-LogAndConsole "Учетная запись $adminName активирована"
             
@@ -351,7 +314,6 @@ if ($adminName -eq $null) {
                 Write-LogAndConsole "Выход из системы для входа под учетной записью $adminName..."
                 $logoutConfirm = Read-Host "Нажмите Enter для выхода из системы или 'n' для отмены"
                 if ($logoutConfirm -ne "n") {
-                    # Используем функцию для надежного выхода из системы
                     ForceLogout -Timeout 5
                 } else {
                     Write-LogAndConsole "Выход отменен пользователем"
@@ -375,17 +337,14 @@ if ($adminName -eq $null) {
                         
                         ToggleUserAccount -Username $currentUser -Action "Disable"
                         
-                        # Выход из системы
                         Write-LogAndConsole "Выполняется выход из системы через 5 секунд..."
                         $logoutConfirm = Read-Host "Нажмите Enter для выхода из системы или 'n' для отмены"
                         if ($logoutConfirm -ne "n") {
-                            # Используем функцию для надежного выхода из системы
                             ForceLogout -Timeout 5
                         } else {
                             Write-LogAndConsole "Выход отменен пользователем"
                         }
                     } else {
-                        # Опция выхода из скрипта или продолжения
                         $continueOrExit = Read-Host "Выйти из скрипта для перезапуска под учетной записью $adminName? (y/n)"
                         if ($continueOrExit -eq "y") {
                             Write-LogAndConsole "Выход из скрипта по запросу пользователя."
@@ -435,7 +394,6 @@ Write-Host "Скрипт переместит выбранный профиль 
 Write-Host "В исходном месте будет создана символическая ссылка."
 Write-Host ""
 
-# Проверка, запущен ли скрипт под учетной записью Администратор
 $isBuiltInAdminAccount = IsBuiltInAdmin
 if (-not $isBuiltInAdminAccount) {
     Write-LogAndConsole "ОШИБКА: Перенос профиля доступен только при запуске от имени встроенной учетной записи Администратор."
@@ -445,17 +403,14 @@ if (-not $isBuiltInAdminAccount) {
     exit 1
 }
 
-# Текущий пользователь - запрашиваем из системы, когда нужно
 $CurrentUser = $env:USERNAME
 Write-LogAndConsole "Текущий пользователь: $CurrentUser"
 
-# Функция для выбора целевого диска
 function SelectTargetDrive {
     Write-Host ""
     Write-LogAndConsole "*** Этап 1: Выбор целевого диска ***"
     Write-Host ""
     
-    # Получение списка доступных дисков
     $drives = Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Name -ne "C" -and $_.Free -gt 0 }
     
     if ($drives.Count -eq 0) {
@@ -464,7 +419,6 @@ function SelectTargetDrive {
         exit 1
     }
     
-    # Вывод списка доступных дисков
     Write-LogAndConsole "Доступные диски:"
     $index = 1
     foreach ($drive in $drives) {
@@ -476,7 +430,6 @@ function SelectTargetDrive {
         $index++
     }
     
-    # Выбор диска
     $selection = 0
     do {
         try {
@@ -494,7 +447,6 @@ function SelectTargetDrive {
     return $targetPath
 }
 
-# Функция для копирования профиля текущего пользователя
 function CopyProfilesAndCreateSymlink {
     param (
         [string]$TargetPath
@@ -504,14 +456,12 @@ function CopyProfilesAndCreateSymlink {
     Write-LogAndConsole "*** Этап 2: Копирование профиля пользователя ***"
     Write-Host ""
     
-    # Используем выбранного пользователя вместо текущего
     $userToMove = $Global:SelectedUserName
     $sourceUserProfile = "C:\Users\$userToMove"
     $targetUserProfile = "$TargetPath\$userToMove"
     
     Write-LogAndConsole "Копирование профиля пользователя $userToMove"
     
-    # Создаем папку назначения, если её нет
     if (-not (Test-Path $TargetPath)) {
         Write-LogAndConsole "Создание папки $TargetPath"
         try {
@@ -525,7 +475,6 @@ function CopyProfilesAndCreateSymlink {
         Write-LogAndConsole "Папка $TargetPath уже существует"
     }
     
-    # Проверяем, существует ли уже профиль пользователя в целевой папке
     if (Test-Path $targetUserProfile) {
         Write-LogAndConsole "ВНИМАНИЕ: Профиль пользователя $userToMove уже существует в $TargetPath"
         $action = Read-Host "Профиль уже существует. Выберите действие: (r)eplace - заменить, (s)kip - пропустить копирование, (a)bort - отменить"
@@ -558,10 +507,8 @@ function CopyProfilesAndCreateSymlink {
         }
     }
     
-    # Копирование профиля пользователя
     Write-LogAndConsole "Копирование профиля пользователя $userToMove из $sourceUserProfile в $targetUserProfile"
     
-    # Создаем целевую папку пользователя
     if (-not (Test-Path $targetUserProfile)) {
         try {
             New-Item -Path $targetUserProfile -ItemType Directory -Force | Out-Null
@@ -572,15 +519,12 @@ function CopyProfilesAndCreateSymlink {
         }
     }
     
-    # Копирование с robocopy для сохранения прав доступа и атрибутов
     try {
         $robocopyArgs = "`"$sourceUserProfile`" `"$targetUserProfile`" /E /COPYALL /DCOPY:T /R:1 /W:1 /XJ"
         Write-LogAndConsole "Запуск команды: robocopy $robocopyArgs"
         
         $robocopyProcess = Start-Process -FilePath "robocopy" -ArgumentList $robocopyArgs -NoNewWindow -Wait -PassThru
         
-        # Проверка кода возврата robocopy
-        # Коды от 0 до 7 считаются успешными для robocopy
         if ($robocopyProcess.ExitCode -lt 8) {
             Write-LogAndConsole "Копирование профиля завершено успешно"
             return "success"
@@ -608,7 +552,6 @@ function CopyProfilesAndCreateSymlink {
     }
 }
 
-# Функция для создания символической ссылки для профиля пользователя
 function CreateSymbolicLink {
     param (
         [string]$TargetPath,
@@ -624,21 +567,16 @@ function CreateSymbolicLink {
     Write-LogAndConsole "*** Этап 3: Создание символической ссылки для профиля пользователя ***"
     Write-Host ""
     
-    # Используем выбранного пользователя вместо текущего
     $userToMove = $Global:SelectedUserName
     $sourceUserProfile = "C:\Users\$userToMove"
     $targetUserProfile = "$TargetPath\$userToMove"
     
-    # Создание символической ссылки
     Write-Host "Создание символической ссылки..."
     
     try {
-        # Проверяем, существует ли исходный профиль пользователя
         if (Test-Path $sourceUserProfile) {
-            # Удаление исходного профиля пользователя
             Write-LogAndConsole "Удаление исходного профиля пользователя $sourceUserProfile"
             
-            # Сначала попробуем переименовать папку для безопасности
             $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
             $backupDir = "C:\Users\${userToMove}_backup_$timestamp"
             
@@ -649,20 +587,17 @@ function CreateSymbolicLink {
                 Write-LogAndConsole ("ОШИБКА при переименовании ${sourceUserProfile}: {0}" -f $_.Exception.Message)
                 Write-LogAndConsole "Попытка прямого удаления папки..."
                 
-                # Если переименование не удалось, пытаемся удалить
                 try {
                     Remove-Item -Path $sourceUserProfile -Force -Recurse
                 } catch {
                     Write-LogAndConsole ("ОШИБКА при удалении ${sourceUserProfile}: {0}" -f $_.Exception.Message)
                     
-                    # Проверяем, существует ли папка профиля (может быть уже символической ссылкой)
                     if (Test-Path $sourceUserProfile) {
                         $linkInfo = Get-Item $sourceUserProfile -Force
                         
                         if ($linkInfo.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
                             Write-LogAndConsole "$sourceUserProfile уже является символической ссылкой"
                             
-                            # Проверяем, указывает ли она на нужный нам путь
                             try {
                                 $linkTarget = (Get-Item $sourceUserProfile).Target
                                 
@@ -695,15 +630,12 @@ function CreateSymbolicLink {
             }
         }
         
-        # Создание символической ссылки
         Write-Host "Создание символической ссылки $sourceUserProfile -> $targetUserProfile"
         cmd /c mklink /d "$sourceUserProfile" "$targetUserProfile"
         
-        # Проверка создания символической ссылки
         if (Test-Path $sourceUserProfile) {
             Write-LogAndConsole "Символическая ссылка $sourceUserProfile успешно создана"
             
-            # Проверим, создана ли директория в правильное место
             try {
                 $linkItem = Get-Item $sourceUserProfile -Force
                 if ($linkItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
@@ -717,7 +649,6 @@ function CreateSymbolicLink {
         } else {
             Write-LogAndConsole "ОШИБКА: Не удалось создать символическую ссылку ${sourceUserProfile}"
             
-            # Восстановление из резервной копии
             if (Test-Path $backupDir) {
                 Write-LogAndConsole "Восстановление из резервной копии $backupDir"
                 try {
@@ -742,10 +673,8 @@ function CreateSymbolicLink {
     }
 }
 
-# Выполнение основных функций
 $TargetPath = SelectTargetDrive
 $CopyStatus = CopyProfilesAndCreateSymlink -TargetPath $TargetPath
 CreateSymbolicLink -TargetPath $TargetPath -CopyStatus $CopyStatus
 
-# Предлагаем перезагрузку
 OfferRestart -TargetPath $TargetPath 
