@@ -22,16 +22,13 @@ function Write-LogAndConsole {
 
 function Show-Header {
     param(
-        [Parameter(Mandatory = $true)]
-        [string]$Title,
-        
         [Parameter(Mandatory = $false)]
         [string]$StepDescription = ""
     )
     
     Clear-Host
     
-    $titleWithVersion = "$Title v$ScriptVersion"
+    $titleWithVersion = "МИГРАЦИЯ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ WINDOWS v$ScriptVersion"
     $desc = if ($StepDescription -ne "") { "* $StepDescription *" } else { "" }
     $maxLength = [math]::Max($titleWithVersion.Length, $desc.Length)
     $width = $maxLength + 10
@@ -125,7 +122,7 @@ function FormatFileSize {
 }
 
 function ShowUserAccounts {
-    Show-Header -Title "УПРАВЛЕНИЕ УЧЕТНЫМИ ЗАПИСЯМИ" -StepDescription "Выбор учетной записи для управления"
+    Show-Header -StepDescription "Выбор учетной записи для управления"
     
     $allUsers = GetNonSystemUsers
     
@@ -150,12 +147,12 @@ function ShowUserAccounts {
 }
 
 function ManageUserAccount {
-    Show-Header -Title "УПРАВЛЕНИЕ УЧЕТНЫМИ ЗАПИСЯМИ" -StepDescription "Шаг 1: Выбор учетной записи"
+    Show-Header -StepDescription "Шаг 1: Выбор учетной записи"
     
     $selectedUser = ShowUserAccounts
     if ($null -eq $selectedUser) { return }
     
-    Show-Header -Title "УПРАВЛЕНИЕ УЧЕТНОЙ ЗАПИСЬЮ" -StepDescription "Шаг 2: Управление выбранной учетной записью"
+    Show-Header -StepDescription "Шаг 2: Управление выбранной учетной записью"
     
     $currentStatus = $selectedUser.Enabled
     
@@ -194,7 +191,7 @@ function SelectUserProfile {
         return $null
     }
     
-    Show-Header -Title "ВЫБОР ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ" -StepDescription "Шаг 1.1: Выбор профиля пользователя для миграции"
+    Show-Header -StepDescription "Шаг 1.1: Выбор профиля пользователя для миграции"
     
     Write-LogAndConsole "Найдены следующие профили пользователей"
     Write-Host ""
@@ -237,7 +234,7 @@ function SelectUserProfile {
 }
 
 function SelectTargetDrive {
-    Show-Header -Title "ВЫБОР ЦЕЛЕВОГО ДИСКА" -StepDescription "Шаг 1.2: Выбор диска для хранения профиля"
+    Show-Header -StepDescription "Шаг 1.2: Выбор диска для хранения профиля"
     
     Write-LogAndConsole "Выберите диск, на который будет перенесен профиль пользователя"
     Write-LogAndConsole "ИСХОДНЫЙ профиль останется в C:\Users\{имя пользователя} в виде символической ссылки"
@@ -311,7 +308,7 @@ function CopyUserProfile {
         [string]$TargetPath
     )
     
-    Show-Header -Title "КОПИРОВАНИЕ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ" -StepDescription "Шаг 1.3: Копирование профиля пользователя"
+    Show-Header -StepDescription "Шаг 1.3: Копирование профиля пользователя"
     
     $sourceUserProfile = "$UsersProfileRoot\$UserName"
     $targetUserProfile = "$TargetPath\$UserName"
@@ -571,7 +568,7 @@ function CreateSymbolicLink {
         return $true
     }
     
-    Show-Header -Title "СОЗДАНИЕ СИМВОЛИЧЕСКОЙ ССЫЛКИ" -StepDescription "Шаг 1.4: Создание символической ссылки для профиля пользователя"
+    Show-Header -StepDescription "Шаг 1.4: Создание символической ссылки для профиля пользователя"
     
     $sourceUserProfile = "$UsersProfileRoot\$UserName"
     $targetUserProfile = "$TargetPath\$UserName"
@@ -672,7 +669,7 @@ function FinishOperation {
         [string]$CopyStatus = ""
     )
     
-    Show-Header -Title "ЗАВЕРШЕНИЕ МИГРАЦИИ ПРОФИЛЯ" -StepDescription "Шаг 1.5: Завершение процесса миграции"
+    Show-Header -StepDescription "Шаг 1.5: Завершение процесса миграции"
     
     Write-LogAndConsole "Миграция профиля пользователя $UserName успешно завершена"
     
@@ -697,7 +694,7 @@ function FinishOperation {
 }
 
 function MigrateUserProfile {
-    Show-Header -Title "МИГРАЦИЯ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ" -StepDescription "Шаг 1: Мастер миграции профиля пользователя"
+    Show-Header -StepDescription "Шаг 1: Мастер миграции профиля пользователя"
     
     Write-LogAndConsole "Это мастер поможет вам перенести профиль пользователя на другой диск"
     Write-LogAndConsole "с сохранением доступа через символическую ссылку из исходного места."
@@ -709,7 +706,7 @@ function MigrateUserProfile {
     $targetPath = SelectTargetDrive
     if ($null -eq $targetPath) { return }
     
-    Show-Header -Title "ПОДТВЕРЖДЕНИЕ МИГРАЦИИ" -StepDescription "Проверка выбранных параметров"
+    Show-Header -StepDescription "Проверка выбранных параметров"
     
     Write-LogAndConsole "Параметры миграции:"
     Write-LogAndConsole "- ИСХОДНЫЙ профиль: $UsersProfileRoot\$userName"
@@ -732,7 +729,7 @@ function MigrateUserProfile {
 }
 
 function ManageAdminAccount {
-    Show-Header -Title "УПРАВЛЕНИЕ УЧЕТНОЙ ЗАПИСЬЮ АДМИНИСТРАТОРА" -StepDescription "Управление встроенной учетной записью администратора"
+    Show-Header -StepDescription "Управление учетной записью администратора"
     
     $adminName = GetBuiltInAdminName
     
@@ -763,7 +760,7 @@ function ManageAdminAccount {
 }
 
 function SwitchToAdminAccount {
-    Show-Header -Title "МИГРАЦИЯ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ WINDOWS" -StepDescription "Проверка необходимых разрешений"
+    Show-Header -StepDescription "Проверка необходимых разрешений"
     
     $adminName = GetBuiltInAdminName
     
@@ -828,7 +825,7 @@ function SwitchToAdminAccount {
 }
 
 function CheckMigrationStatus {
-    Show-Header -Title "ПРОВЕРКА РЕЗУЛЬТАТОВ МИГРАЦИИ" -StepDescription "Анализ состояния перенесенных профилей"
+    Show-Header -StepDescription "Анализ состояния перенесенных профилей"
     
     Write-LogAndConsole "Проверка символических ссылок в профилях пользователей"
     Write-Host ""
@@ -872,7 +869,7 @@ function ShowAdminMenu {
     $continue = $true
     
     while ($continue) {
-        Show-Header -Title "МИГРАЦИЯ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ WINDOWS" -StepDescription "Главное меню (режим администратора)"
+        Show-Header -StepDescription "Главное меню (режим администратора)"
         
         Write-Host "Текущий пользователь: $env:USERNAME"
         Write-Host ""
@@ -897,7 +894,7 @@ function ShowUserMenu {
     $continue = $true
     
     while ($continue) {
-        Show-Header -Title "МИГРАЦИЯ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ WINDOWS" -StepDescription "Главное меню (режим пользователя)"
+        Show-Header -StepDescription "Главное меню (режим пользователя)"
         
         Write-Host "Текущий пользователь: $env:USERNAME"
         Write-Host ""
