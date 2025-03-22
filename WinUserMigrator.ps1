@@ -290,6 +290,19 @@ function SelectTargetDrive {
     }
 }
 
+function IsSymbolicLink {
+    param(
+        [string]$Path
+    )
+    
+    if (Test-Path $Path) {
+        $item = Get-Item $Path -Force
+        return ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
+    }
+    
+    return $false
+}
+
 function CopyUserProfile {
     param (
         [string]$UserName,
@@ -312,7 +325,26 @@ function CopyUserProfile {
         }
     }
     
-    if (Test-Path $targetUserProfile) {
+    $isSourceSymLink = IsSymbolicLink -Path $sourceUserProfile
+    $isTargetSymLink = IsSymbolicLink -Path $targetUserProfile
+    
+    if ($isSourceSymLink) {
+        $sourceTarget = (Get-Item $sourceUserProfile -Force).Target
+        Write-LogAndConsole "ВНИМАНИЕ: Исходный профиль '$sourceUserProfile' уже является символической ссылкой на '$sourceTarget'"
+        Write-LogAndConsole "Миграция уже была выполнена ранее."
+        Read-Host "Нажмите Enter, чтобы вернуться в главное меню"
+        return $null
+    }
+    
+    if ($isTargetSymLink) {
+        $targetTarget = (Get-Item $targetUserProfile -Force).Target
+        Write-LogAndConsole "ВНИМАНИЕ: Целевой профиль '$targetUserProfile' уже является символической ссылкой на '$targetTarget'"
+        Write-LogAndConsole "Миграция в этом случае не поддерживается, так как это необычная конфигурация."
+        Read-Host "Нажмите Enter, чтобы вернуться в главное меню"
+        return $null
+    }
+    
+    if (Test-Path $targetUserProfile -and -not $isTargetSymLink) {
         Write-LogAndConsole "ВНИМАНИЕ: Профиль уже существует в целевом расположении: $targetUserProfile"
         Write-Host ""
         Write-Host "Выберите действие:"
@@ -532,8 +564,8 @@ function CreateSymbolicLink {
         [string]$CopyStatus
     )
     
-    if ($CopyStatus -eq "source_renamed") {
-        Write-LogAndConsole "Пропуск создания символической ссылки (исходный профиль уже переименован и связан)"
+    if ($CopyStatus -eq "source_renamed" -or $CopyStatus -eq "already_migrated") {
+        Write-LogAndConsole "Пропуск создания символической ссылки (исходный профиль уже $(if ($CopyStatus -eq 'source_renamed') { 'переименован и связан' } else { 'является символической ссылкой' }))"
         return $true
     }
     
@@ -544,42 +576,65 @@ function CreateSymbolicLink {
     
     try {
         if (Test-Path $sourceUserProfile) {
-            $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-            $backupDir = "$UsersProfileRoot\${UserName}_backup_$timestamp"
+            $isSourceSymLink = IsSymbolicLink -Path $sourceUserProfile
             
-            try {
-                Write-LogAndConsole "Переименование исходного профиля в $backupDir"
-                Rename-Item -Path $sourceUserProfile -NewName $backupDir -Force
-            } catch {
-                Write-LogAndConsole "ОШИБКА при переименовании профиля: $($_.Exception.Message)"
-                Write-LogAndConsole "Попытка прямого удаления папки..."
+            if ($isSourceSymLink) {
+                $existingTarget = (Get-Item $sourceUserProfile -Force).Target
+                Write-LogAndConsole "Обнаружено: исходный профиль '$sourceUserProfile' уже является символической ссылкой на '$existingTarget'"
+                
+                if ($existingTarget -eq $targetUserProfile) {
+                    Write-LogAndConsole "Символическая ссылка уже настроена правильно и указывает на целевой профиль"
+                    return $true
+                } else {
+                    Write-LogAndConsole "Текущая ссылка указывает на другой профиль. Необходимо её обновить."
+                    
+                    try {
+                        Remove-Item -Path $sourceUserProfile -Force
+                        Write-LogAndConsole "Существующая ссылка удалена"
+                    } catch {
+                        Write-LogAndConsole "ОШИБКА при удалении существующей ссылки: $($_.Exception.Message)"
+                        Read-Host "Нажмите Enter для возврата в главное меню"
+                        return $false
+                    }
+                }
+            } else {
+                $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+                $backupDir = "$UsersProfileRoot\${UserName}_backup_$timestamp"
                 
                 try {
-                    Remove-Item -Path $sourceUserProfile -Force -Recurse
+                    Write-LogAndConsole "Переименование исходного профиля в $backupDir"
+                    Rename-Item -Path $sourceUserProfile -NewName $backupDir -Force
                 } catch {
-                    Write-LogAndConsole "ОШИБКА при удалении исходного профиля: $($_.Exception.Message)"
+                    Write-LogAndConsole "ОШИБКА при переименовании профиля: $($_.Exception.Message)"
+                    Write-LogAndConsole "Попытка прямого удаления папки..."
                     
-                    if ((Test-Path $sourceUserProfile) -and 
-                        ((Get-Item $sourceUserProfile -Force).Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
-                            
-                        try {
-                            $linkTarget = (Get-Item $sourceUserProfile).Target
-                            if ($linkTarget -eq $targetUserProfile) {
-                                Write-LogAndConsole "Существующая символическая ссылка уже указывает на $targetUserProfile"
-                                return $true
-                            } else {
-                                Write-LogAndConsole "Текущая ссылка указывает на $linkTarget, удаление..."
-                                Remove-Item -Path $sourceUserProfile -Force
+                    try {
+                        Remove-Item -Path $sourceUserProfile -Force -Recurse
+                    } catch {
+                        Write-LogAndConsole "ОШИБКА при удалении исходного профиля: $($_.Exception.Message)"
+                        
+                        if ((Test-Path $sourceUserProfile) -and 
+                            ((Get-Item $sourceUserProfile -Force).Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
+                                
+                            try {
+                                $linkTarget = (Get-Item $sourceUserProfile).Target
+                                if ($linkTarget -eq $targetUserProfile) {
+                                    Write-LogAndConsole "Существующая символическая ссылка уже указывает на $targetUserProfile"
+                                    return $true
+                                } else {
+                                    Write-LogAndConsole "Текущая ссылка указывает на $linkTarget, удаление..."
+                                    Remove-Item -Path $sourceUserProfile -Force
+                                }
+                            } catch {
+                                Write-LogAndConsole "ОШИБКА при работе с существующей ссылкой: $($_.Exception.Message)"
+                                Read-Host "Нажмите Enter для возврата в главное меню"
+                                return $false
                             }
-                        } catch {
-                            Write-LogAndConsole "ОШИБКА при работе с существующей ссылкой: $($_.Exception.Message)"
+                        } else {
+                            Write-LogAndConsole "Не удалось удалить или переместить папку исходного профиля"
                             Read-Host "Нажмите Enter для возврата в главное меню"
                             return $false
                         }
-                    } else {
-                        Write-LogAndConsole "Не удалось удалить или переместить папку исходного профиля"
-                        Read-Host "Нажмите Enter для возврата в главное меню"
-                        return $false
                     }
                 }
             }
@@ -611,14 +666,22 @@ function CreateSymbolicLink {
 function FinishOperation {
     param (
         [string]$UserName,
-        [string]$TargetPath
+        [string]$TargetPath,
+        [string]$CopyStatus = ""
     )
     
     Show-Header -Title "ЗАВЕРШЕНИЕ МИГРАЦИИ ПРОФИЛЯ" -StepDescription "Шаг 1.5: Завершение процесса миграции"
     
     Write-LogAndConsole "Миграция профиля пользователя $UserName успешно завершена"
-    Write-LogAndConsole "Исходное расположение профиля: $UsersProfileRoot\$UserName (теперь символическая ссылка)"
-    Write-LogAndConsole "Новое физическое расположение профиля: $TargetPath\$UserName"
+    
+    if ($CopyStatus -eq "already_migrated") {
+        Write-LogAndConsole "Профиль уже был перенесен ранее."
+        Write-LogAndConsole "Исходное расположение профиля: $UsersProfileRoot\$UserName (символическая ссылка)"
+        Write-LogAndConsole "Физическое расположение профиля: $((Get-Item $UsersProfileRoot\$UserName -Force).Target)"
+    } else {
+        Write-LogAndConsole "Исходное расположение профиля: $UsersProfileRoot\$UserName (теперь символическая ссылка)"
+        Write-LogAndConsole "Новое физическое расположение профиля: $TargetPath\$UserName"
+    }
     
     ToggleUserAccount -Username $UserName -Action "Enable"
     
@@ -663,7 +726,7 @@ function MigrateUserProfile {
     $linkCreated = CreateSymbolicLink -UserName $userName -TargetPath $targetPath -CopyStatus $copyStatus
     if (-not $linkCreated) { return }
     
-    FinishOperation -UserName $userName -TargetPath $targetPath
+    FinishOperation -UserName $userName -TargetPath $targetPath -CopyStatus $copyStatus
 }
 
 function ManageAdminAccount {
