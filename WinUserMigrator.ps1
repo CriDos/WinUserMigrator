@@ -3,6 +3,7 @@
 $ScriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 $DateTime = Get-Date -Format 'yyyy-MM-dd_HHmmss'
 $LogFile = "$ScriptPath\MoveUserProfile_$DateTime.log"
+$UsersProfileRoot = $env:SystemDrive + "\Users"
 
 "========================================" | Out-File -FilePath $LogFile -Encoding utf8
 "Скрипт запущен: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File -FilePath $LogFile -Append -Encoding utf8
@@ -101,6 +102,22 @@ function GetNonSystemUsers {
     }
 }
 
+function FormatFileSize {
+    param ([long]$SizeInBytes)
+    
+    if ($SizeInBytes -ge 1TB) {
+        return "{0:N2} TB" -f ($SizeInBytes / 1TB)
+    } elseif ($SizeInBytes -ge 1GB) {
+        return "{0:N2} GB" -f ($SizeInBytes / 1GB)
+    } elseif ($SizeInBytes -ge 1MB) {
+        return "{0:N2} MB" -f ($SizeInBytes / 1MB)
+    } elseif ($SizeInBytes -ge 1KB) {
+        return "{0:N2} KB" -f ($SizeInBytes / 1KB)
+    } else {
+        return "$SizeInBytes bytes"
+    }
+}
+
 function ShowUserAccounts {
     Show-Header -Title "УПРАВЛЕНИЕ УЧЕТНЫМИ ЗАПИСЯМИ" -StepDescription "Выбор учетной записи для управления"
     
@@ -159,7 +176,7 @@ function SelectUserProfile {
     $allUsers = GetNonSystemUsers
         
     foreach ($user in $allUsers) {
-        $userProfilePath = "C:\Users\$($user.Name)"
+        $userProfilePath = "$UsersProfileRoot\$($user.Name)"
         if (Test-Path $userProfilePath) {
             $usersWithProfiles += $user.Name
         }
@@ -177,10 +194,11 @@ function SelectUserProfile {
     Write-Host ""
         
     for ($i = 0; $i -lt $usersWithProfiles.Count; $i++) {
-        $userProPath = "C:\Users\$($usersWithProfiles[$i])"
-        $userProSize = "{0:N2} MB" -f ((Get-ChildItem -Path $userProPath -Recurse -Force -ErrorAction SilentlyContinue | 
-                                        Measure-Object -Property Length -Sum).Sum / 1MB)
-        Write-LogAndConsole "  $($i+1). $($usersWithProfiles[$i]) - размер: $userProSize (ИСТОЧНИК: $userProPath)"
+        $userProPath = "$UsersProfileRoot\$($usersWithProfiles[$i])"
+        $userProSize = (Get-ChildItem -Path $userProPath -Recurse -Force -ErrorAction SilentlyContinue | 
+                        Measure-Object -Property Length -Sum).Sum
+        $formattedSize = FormatFileSize -SizeInBytes $userProSize
+        Write-LogAndConsole "  $($i+1). $($usersWithProfiles[$i]) - размер: $formattedSize (ИСТОЧНИК: $userProPath)"
     }
     
     Write-Host ""
@@ -189,7 +207,7 @@ function SelectUserProfile {
         $confirmSelect = Read-Host "Найден только один профиль пользователя. Использовать его для миграции? (д/н)"
         
         if ($confirmSelect.ToLower() -eq "д") {
-            Write-LogAndConsole "Выбран ИСХОДНЫЙ профиль пользователя: C:\Users\$($usersWithProfiles[0])"
+            Write-LogAndConsole "Выбран ИСХОДНЫЙ профиль пользователя: $UsersProfileRoot\$($usersWithProfiles[0])"
             return $usersWithProfiles[0]
         } else {
             Write-LogAndConsole "Выбор профиля отменен"
@@ -207,7 +225,7 @@ function SelectUserProfile {
         } while ($selectedIndex -lt 1 -or $selectedIndex -gt $usersWithProfiles.Count)
         
         $selectedUser = $usersWithProfiles[$selectedIndex - 1]
-        Write-LogAndConsole "Выбран ИСХОДНЫЙ профиль пользователя: C:\Users\$selectedUser"
+        Write-LogAndConsole "Выбран ИСХОДНЫЙ профиль пользователя: $UsersProfileRoot\$selectedUser"
         return $selectedUser
     }
 }
@@ -276,7 +294,7 @@ function CopyUserProfile {
     
     Show-Header -Title "КОПИРОВАНИЕ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ" -StepDescription "Шаг 1.3: Копирование профиля пользователя"
     
-    $sourceUserProfile = "C:\Users\$UserName"
+    $sourceUserProfile = "$UsersProfileRoot\$UserName"
     $targetUserProfile = "$TargetPath\$UserName"
     
     if (-not (Test-Path $TargetPath)) {
@@ -295,7 +313,7 @@ function CopyUserProfile {
         Write-Host ""
         Write-Host "Выберите действие:"
         Write-Host "1. Переименовать целевой профиль '$targetUserProfile' в '${targetUserProfile}_old' и продолжить миграцию"
-        Write-Host "2. Переименовать исходный профиль 'C:\Users\$UserName' в 'C:\Users\${UserName}_old' и использовать целевой профиль"
+        Write-Host "2. Переименовать исходный профиль '$UsersProfileRoot\$UserName' в 'C:\Users\${UserName}_old' и использовать целевой профиль"
         Write-Host "3. Заменить существующий профиль на целевом диске '$targetUserProfile'"
         Write-Host "0. Вернуться в главное меню"
         
@@ -328,7 +346,7 @@ function CopyUserProfile {
                 Rename-Item -Path $sourceUserProfile -NewName $oldSourceProfile -Force
                 
                 Write-LogAndConsole "Создание символической ссылки из $sourceUserProfile на $targetUserProfile"
-                cmd /c mklink /d "$sourceUserProfile" "$targetUserProfile"
+                cmd /c mklink /d "`"$sourceUserProfile`"" "`"$targetUserProfile`""
                 
                 if (Test-Path $sourceUserProfile) {
                     $linkItem = Get-Item $sourceUserProfile -Force
@@ -409,10 +427,48 @@ function CopyUserProfile {
     }
     
     try {
-        $robocopyArgs = "`"$sourceUserProfile`" `"$targetUserProfile`" /E /COPYALL /DCOPY:T /R:1 /W:1 /XJ"
+        # Оценка размера профиля для отображения прогресса
+        $userSize = (Get-ChildItem -Path $sourceUserProfile -Recurse -Force -ErrorAction SilentlyContinue | 
+                    Measure-Object -Property Length -Sum).Sum
+        $formattedSize = FormatFileSize -SizeInBytes $userSize
+        
+        Write-LogAndConsole "Размер профиля для копирования: $formattedSize"
+        Write-LogAndConsole "Запуск процесса копирования. Это может занять продолжительное время..."
+        Write-Host ""
+        Write-Host "Для отслеживания прогресса наблюдайте за активностью на дисках и за сообщениями ниже:"
+        
+        # Создаем папку для отслеживания прогресса
+        $progressDir = "$env:TEMP\ProfileMigrationProgress_$DateTime"
+        New-Item -Path $progressDir -ItemType Directory -Force | Out-Null
+        
+        # Запускаем в отдельном процессе монитор копирования
+        $monitorScript = {
+            param ($targetDir, $progressDir)
+            
+            while ($true) {
+                $stats = Get-ChildItem -Path $targetDir -Recurse -Force -ErrorAction SilentlyContinue | 
+                        Measure-Object -Property Length -Sum
+                $currentSize = $stats.Sum
+                $fileCount = $stats.Count
+                
+                # Запись прогресса
+                "$currentSize|$fileCount" | Out-File -FilePath "$progressDir\progress.txt" -Force
+                
+                Start-Sleep -Seconds 5
+            }
+        }
+        
+        $monitorJob = Start-Job -ScriptBlock $monitorScript -ArgumentList $targetUserProfile, $progressDir
+        
+        $robocopyArgs = "`"$sourceUserProfile`" `"$targetUserProfile`" /E /COPYALL /DCOPY:T /R:3 /W:5 /MT /XJ"
         Write-LogAndConsole "Выполнение команды: robocopy $robocopyArgs"
         
         $robocopyProcess = Start-Process -FilePath "robocopy" -ArgumentList $robocopyArgs -NoNewWindow -Wait -PassThru
+        
+        # Остановка монитора копирования
+        Stop-Job -Job $monitorJob
+        Remove-Job -Job $monitorJob
+        Remove-Item -Path $progressDir -Recurse -Force -ErrorAction SilentlyContinue
         
         if ($robocopyProcess.ExitCode -lt 8) {
             Write-LogAndConsole "Копирование профиля успешно завершено"
@@ -437,6 +493,40 @@ function CopyUserProfile {
     }
 }
 
+function CreateSymLink {
+    param (
+        [string]$Source,
+        [string]$Target,
+        [switch]$IsDirectory = $true
+    )
+    
+    # Безопасное формирование путей для mklink
+    $safeSource = $Source -replace '"', '\"'
+    $safeTarget = $Target -replace '"', '\"'
+    
+    $dirFlag = if ($IsDirectory) { "/d" } else { "" }
+    
+    try {
+        Write-LogAndConsole "Создание символической ссылки из $Source на $Target"
+        cmd /c mklink $dirFlag "`"$safeSource`"" "`"$safeTarget`""
+        
+        if (Test-Path $Source) {
+            $linkItem = Get-Item $Source -Force
+            if ($linkItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+                Write-LogAndConsole "Символическая ссылка успешно создана"
+                return $true
+            }
+        }
+        
+        Write-LogAndConsole "ОШИБКА: Не удалось создать символическую ссылку"
+        return $false
+    }
+    catch {
+        Write-LogAndConsole "ОШИБКА при создании символической ссылки: $($_.Exception.Message)"
+        return $false
+    }
+}
+
 function CreateSymbolicLink {
     param (
         [string]$UserName,
@@ -451,13 +541,13 @@ function CreateSymbolicLink {
     
     Show-Header -Title "СОЗДАНИЕ СИМВОЛИЧЕСКОЙ ССЫЛКИ" -StepDescription "Шаг 1.4: Создание символической ссылки для профиля пользователя"
     
-    $sourceUserProfile = "C:\Users\$UserName"
+    $sourceUserProfile = "$UsersProfileRoot\$UserName"
     $targetUserProfile = "$TargetPath\$UserName"
     
     try {
         if (Test-Path $sourceUserProfile) {
             $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-            $backupDir = "C:\Users\${UserName}_backup_$timestamp"
+            $backupDir = "$UsersProfileRoot\${UserName}_backup_$timestamp"
             
             try {
                 Write-LogAndConsole "Переименование исходного профиля в $backupDir"
@@ -497,22 +587,11 @@ function CreateSymbolicLink {
             }
         }
         
-        Write-LogAndConsole "Создание символической ссылки из $sourceUserProfile на $targetUserProfile"
-        cmd /c mklink /d "$sourceUserProfile" "$targetUserProfile"
+        $linkCreated = CreateSymLink -Source $sourceUserProfile -Target $targetUserProfile -IsDirectory
         
-        if (Test-Path $sourceUserProfile) {
-            $linkItem = Get-Item $sourceUserProfile -Force
-            if ($linkItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
-                Write-LogAndConsole "Проверка успешна: C:\Users\$UserName теперь является символической ссылкой на $targetUserProfile"
-                return $true
-            } else {
-                Write-LogAndConsole "ВНИМАНИЕ: C:\Users\$UserName не является символической ссылкой"
-            }
-        } else {
-            Write-LogAndConsole "ОШИБКА: Не удалось создать символическую ссылку"
-            
+        if (-not $linkCreated) {
             if (Test-Path $backupDir) {
-                Write-LogAndConsole "Восстановление из резервной копии $backupDir в C:\Users\$UserName"
+                Write-LogAndConsole "Восстановление из резервной копии $backupDir в $UsersProfileRoot\$UserName"
                 Rename-Item -Path $backupDir -NewName $sourceUserProfile -Force
             } else {
                 Write-LogAndConsole "КРИТИЧЕСКАЯ ОШИБКА: Исходный профиль пользователя удален, но ссылка не создана!"
@@ -521,13 +600,14 @@ function CreateSymbolicLink {
             Read-Host "Нажмите Enter для возврата в главное меню"
             return $false
         }
+        
+        Write-LogAndConsole "Проверка успешна: $UsersProfileRoot\$UserName теперь является символической ссылкой на $targetUserProfile"
+        return $true
     } catch {
         Write-LogAndConsole "ОШИБКА при создании символической ссылки: $($_.Exception.Message)"
         Read-Host "Нажмите Enter для возврата в главное меню"
         return $false
     }
-    
-    return $true
 }
 
 function FinishOperation {
@@ -539,7 +619,7 @@ function FinishOperation {
     Show-Header -Title "ЗАВЕРШЕНИЕ МИГРАЦИИ ПРОФИЛЯ" -StepDescription "Шаг 1.5: Завершение процесса миграции"
     
     Write-LogAndConsole "Миграция профиля пользователя $UserName успешно завершена"
-    Write-LogAndConsole "Исходное расположение профиля: C:\Users\$UserName (теперь символическая ссылка)"
+    Write-LogAndConsole "Исходное расположение профиля: $UsersProfileRoot\$UserName (теперь символическая ссылка)"
     Write-LogAndConsole "Новое физическое расположение профиля: $TargetPath\$UserName"
     
     ToggleUserAccount -Username $UserName -Action "Enable"
@@ -569,7 +649,7 @@ function MigrateUserProfile {
     Show-Header -Title "ПОДТВЕРЖДЕНИЕ МИГРАЦИИ" -StepDescription "Проверка выбранных параметров"
     
     Write-LogAndConsole "Параметры миграции:"
-    Write-LogAndConsole "- ИСХОДНЫЙ профиль: C:\Users\$userName"
+    Write-LogAndConsole "- ИСХОДНЫЙ профиль: $UsersProfileRoot\$userName"
     Write-LogAndConsole "- ЦЕЛЕВОЕ расположение: $targetPath\$userName"
     Write-Host ""
     
@@ -684,6 +764,48 @@ function SwitchToAdminAccount {
     }
 }
 
+function CheckMigrationStatus {
+    Show-Header -Title "ПРОВЕРКА РЕЗУЛЬТАТОВ МИГРАЦИИ" -StepDescription "Анализ состояния перенесенных профилей"
+    
+    Write-LogAndConsole "Проверка символических ссылок в профилях пользователей"
+    Write-Host ""
+    
+    $allUsers = GetNonSystemUsers
+    $migrationCount = 0
+    
+    foreach ($user in $allUsers) {
+        $userProfilePath = "$UsersProfileRoot\$($user.Name)"
+        
+        if (Test-Path $userProfilePath) {
+            $profileItem = Get-Item $userProfilePath -Force
+            
+            if ($profileItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+                $targetPath = $profileItem.Target
+                $migrationCount++
+                
+                Write-LogAndConsole "  [+] $($user.Name): Профиль перенесен, ссылка -> $targetPath"
+                
+                # Проверка доступности целевой папки
+                if (-not (Test-Path $targetPath)) {
+                    Write-LogAndConsole "      ВНИМАНИЕ: Целевая папка недоступна!"
+                }
+            } else {
+                Write-LogAndConsole "  [-] $($user.Name): Стандартный профиль (не перенесен)"
+            }
+        }
+    }
+    
+    Write-Host ""
+    
+    if ($migrationCount -eq 0) {
+        Write-LogAndConsole "На данный момент нет перенесенных профилей пользователей"
+    } else {
+        Write-LogAndConsole "Всего перенесенных профилей: $migrationCount"
+    }
+    
+    Read-Host "`nНажмите Enter для возврата в главное меню"
+}
+
 function ShowAdminMenu {
     $continue = $true
     
@@ -694,11 +816,15 @@ function ShowAdminMenu {
         Write-Host ""
         Write-Host "1. Начать миграцию профиля пользователя"
         Write-Host "2. Управление учетными записями пользователей"
+        Write-Host "3. Управление учетной записью администратора"
+        Write-Host "4. Проверить состояние перенесенных профилей"
         Write-Host "0. Выход"
         
-        switch (Read-Host "`nВыберите действие (0-2)") {
+        switch (Read-Host "`nВыберите действие (0-4)") {
             "1" { MigrateUserProfile }
             "2" { ManageUserAccount }
+            "3" { ManageAdminAccount }
+            "4" { CheckMigrationStatus }
             "0" { $continue = $false }
             default { Read-Host "Некорректный ввод. Нажмите Enter для продолжения..." }
         }
@@ -706,7 +832,24 @@ function ShowAdminMenu {
 }
 
 function ShowUserMenu {
-    SwitchToAdminAccount
+    $continue = $true
+    
+    while ($continue) {
+        Show-Header -Title "МИГРАЦИЯ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ WINDOWS" -StepDescription "Главное меню (режим пользователя)"
+        
+        Write-Host "Текущий пользователь: $env:USERNAME"
+        Write-Host ""
+        Write-Host "1. Проверить состояние перенесенных профилей"
+        Write-Host "2. Перейти в режим администратора"
+        Write-Host "0. Выход"
+        
+        switch (Read-Host "`nВыберите действие (0-2)") {
+            "1" { CheckMigrationStatus }
+            "2" { SwitchToAdminAccount }
+            "0" { $continue = $false }
+            default { Read-Host "Некорректный ввод. Нажмите Enter для продолжения..." }
+        }
+    }
 }
 
 if (-not (IsAdmin)) {
