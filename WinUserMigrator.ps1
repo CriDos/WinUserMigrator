@@ -2,7 +2,11 @@
 
 $ScriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 $DateTime = Get-Date -Format 'yyyy-MM-dd_HHmmss'
-$LogFile = "$ScriptPath\MoveUserProfile_$DateTime.log"
+$LogsDirectory = Join-Path -Path $ScriptPath -ChildPath "Logs"
+if (-not (Test-Path -Path $LogsDirectory)) {
+    New-Item -Path $LogsDirectory -ItemType Directory -Force | Out-Null
+}
+$LogFile = "$LogsDirectory\MoveUserProfile_$DateTime.log"
 $UsersProfileRoot = $env:SystemDrive + "\Users"
 
 "========================================" | Out-File -FilePath $LogFile -Encoding utf8
@@ -427,7 +431,6 @@ function CopyUserProfile {
     }
     
     try {
-        # Оценка размера профиля для отображения прогресса
         $userSize = (Get-ChildItem -Path $sourceUserProfile -Recurse -Force -ErrorAction SilentlyContinue | 
                     Measure-Object -Property Length -Sum).Sum
         $formattedSize = FormatFileSize -SizeInBytes $userSize
@@ -437,11 +440,9 @@ function CopyUserProfile {
         Write-Host ""
         Write-Host "Для отслеживания прогресса наблюдайте за активностью на дисках и за сообщениями ниже:"
         
-        # Создаем папку для отслеживания прогресса
         $progressDir = "$env:TEMP\ProfileMigrationProgress_$DateTime"
         New-Item -Path $progressDir -ItemType Directory -Force | Out-Null
         
-        # Запускаем в отдельном процессе монитор копирования
         $monitorScript = {
             param ($targetDir, $progressDir)
             
@@ -451,7 +452,6 @@ function CopyUserProfile {
                 $currentSize = $stats.Sum
                 $fileCount = $stats.Count
                 
-                # Запись прогресса
                 "$currentSize|$fileCount" | Out-File -FilePath "$progressDir\progress.txt" -Force
                 
                 Start-Sleep -Seconds 5
@@ -465,7 +465,6 @@ function CopyUserProfile {
         
         $robocopyProcess = Start-Process -FilePath "robocopy" -ArgumentList $robocopyArgs -NoNewWindow -Wait -PassThru
         
-        # Остановка монитора копирования
         Stop-Job -Job $monitorJob
         Remove-Job -Job $monitorJob
         Remove-Item -Path $progressDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -500,7 +499,6 @@ function CreateSymLink {
         [switch]$IsDirectory = $true
     )
     
-    # Безопасное формирование путей для mklink
     $safeSource = $Source -replace '"', '\"'
     $safeTarget = $Target -replace '"', '\"'
     
@@ -785,7 +783,6 @@ function CheckMigrationStatus {
                 
                 Write-LogAndConsole "  [+] $($user.Name): Профиль перенесен, ссылка -> $targetPath"
                 
-                # Проверка доступности целевой папки
                 if (-not (Test-Path $targetPath)) {
                     Write-LogAndConsole "      ВНИМАНИЕ: Целевая папка недоступна!"
                 }
