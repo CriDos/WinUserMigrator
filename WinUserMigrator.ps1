@@ -1,5 +1,5 @@
 ﻿$ErrorActionPreference = "Stop"
-$ScriptVersion = "1.0.2"
+$ScriptVersion = "1.0.3"
 
 $ScriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 $DateTime = Get-Date -Format 'yyyy-MM-dd_HHmmss'
@@ -786,9 +786,7 @@ function SwitchToAdminAccount {
         } else {
             Write-LogAndConsole "Учетная запись администратора: ОТКЛЮЧЕНА"
             Write-LogAndConsole "Для миграции профиля пользователя необходимо включить учетную запись администратора."
-            
-            Write-LogAndConsole "Предлагаем автоматически включить учетную запись администратора для выполнения миграции."
-            
+
             if ((Read-Host "`nВключить учетную запись администратора и выйти из системы? (д/н)").ToLower() -eq "д") {
                 if (ToggleUserAccount -Username $adminName -Action "Enable") {
                     
