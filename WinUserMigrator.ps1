@@ -683,7 +683,7 @@ function FinishOperation {
         Write-LogAndConsole "Новое физическое расположение профиля: $TargetPath\$UserName"
     }
     
-    ToggleUserAccount -Username $UserName -Action "Enable"
+    $null = ToggleUserAccount -Username $UserName -Action "Enable"
     
     if ((Read-Host "`n1. Перезагрузить компьютер сейчас`n0. Вернуться в главное меню`n`nВаш выбор (0-1)") -eq "1") {
         Write-LogAndConsole "Перезагрузка компьютера..."
