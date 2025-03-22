@@ -14,6 +14,38 @@ function Write-LogAndConsole {
     Write-Host $Message
 }
 
+function Show-Header {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Title,
+        
+        [Parameter(Mandatory = $false)]
+        [string]$StepDescription = ""
+    )
+    
+    Clear-Host
+    
+    $desc = if ($StepDescription -ne "") { "* $StepDescription *" } else { "" }
+    $maxLength = [math]::Max($Title.Length, $desc.Length)
+    $width = $maxLength + 10
+    
+    $border = "=" * $width
+    
+    Write-Host $border
+    
+    $titleSpaces = [math]::Max(0, [math]::Floor(($width - $Title.Length) / 2))
+    Write-Host (" " * $titleSpaces + $Title)
+    
+    if ($StepDescription -ne "") {
+        Write-Host ""
+        $descSpaces = [math]::Max(0, [math]::Floor(($width - $desc.Length) / 2))
+        Write-Host (" " * $descSpaces + $desc)
+    }
+    
+    Write-Host $border
+    Write-Host ""
+}
+
 function IsAdmin {
     return ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
@@ -70,6 +102,8 @@ function GetNonSystemUsers {
 }
 
 function ShowUserAccounts {
+    Show-Header -Title "УПРАВЛЕНИЕ УЧЕТНЫМИ ЗАПИСЯМИ" -StepDescription "Выбор учетной записи для управления"
+    
     $allUsers = GetNonSystemUsers
     
     Write-LogAndConsole "Список учетных записей пользователей:"
@@ -93,11 +127,12 @@ function ShowUserAccounts {
 }
 
 function ManageUserAccount {
-    Write-Host ""
-    Write-LogAndConsole "*** Управление учетными записями пользователей ***"
+    Show-Header -Title "УПРАВЛЕНИЕ УЧЕТНЫМИ ЗАПИСЯМИ" -StepDescription "Шаг 1: Выбор учетной записи"
     
     $selectedUser = ShowUserAccounts
     if ($null -eq $selectedUser) { return }
+    
+    Show-Header -Title "УПРАВЛЕНИЕ УЧЕТНОЙ ЗАПИСЬЮ" -StepDescription "Шаг 2: Управление выбранной учетной записью"
     
     $currentStatus = $selectedUser.Enabled
     
@@ -136,11 +171,8 @@ function SelectUserProfile {
         return $null
     }
     
-    Clear-Host
-    Write-Host "================================================"
-    Write-Host "           ВЫБОР ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ"
-    Write-Host "================================================"
-    Write-Host ""
+    Show-Header -Title "ВЫБОР ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ" -StepDescription "Шаг 1.1: Выбор профиля пользователя для миграции"
+    
     Write-LogAndConsole "Найдены следующие профили пользователей"
     Write-Host ""
         
@@ -181,11 +213,8 @@ function SelectUserProfile {
 }
 
 function SelectTargetDrive {
-    Clear-Host
-    Write-Host "================================================"
-    Write-Host "              ВЫБОР ЦЕЛЕВОГО ДИСКА"
-    Write-Host "================================================"
-    Write-Host ""
+    Show-Header -Title "ВЫБОР ЦЕЛЕВОГО ДИСКА" -StepDescription "Шаг 1.2: Выбор диска для хранения профиля"
+    
     Write-LogAndConsole "Выберите диск, на который будет перенесен профиль пользователя"
     Write-LogAndConsole "ИСХОДНЫЙ профиль останется в C:\Users\{имя пользователя} в виде символической ссылки"
     Write-Host ""
@@ -245,12 +274,7 @@ function CopyUserProfile {
         [string]$TargetPath
     )
     
-    Clear-Host
-    Write-Host "================================================"
-    Write-Host "           КОПИРОВАНИЕ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ"
-    Write-Host "================================================"
-    Write-Host ""
-    Write-LogAndConsole "*** Шаг 3: Копирование профиля пользователя ***"
+    Show-Header -Title "КОПИРОВАНИЕ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ" -StepDescription "Шаг 1.3: Копирование профиля пользователя"
     
     $sourceUserProfile = "C:\Users\$UserName"
     $targetUserProfile = "$TargetPath\$UserName"
@@ -425,12 +449,7 @@ function CreateSymbolicLink {
         return $true
     }
     
-    Clear-Host
-    Write-Host "================================================"
-    Write-Host "           СОЗДАНИЕ СИМВОЛИЧЕСКОЙ ССЫЛКИ"
-    Write-Host "================================================"
-    Write-Host ""
-    Write-LogAndConsole "*** Шаг 4: Создание символической ссылки для профиля пользователя ***"
+    Show-Header -Title "СОЗДАНИЕ СИМВОЛИЧЕСКОЙ ССЫЛКИ" -StepDescription "Шаг 1.4: Создание символической ссылки для профиля пользователя"
     
     $sourceUserProfile = "C:\Users\$UserName"
     $targetUserProfile = "$TargetPath\$UserName"
@@ -517,11 +536,7 @@ function FinishOperation {
         [string]$TargetPath
     )
     
-    Clear-Host
-    Write-Host "================================================"
-    Write-Host "          ЗАВЕРШЕНИЕ МИГРАЦИИ ПРОФИЛЯ"
-    Write-Host "================================================"
-    Write-Host ""
+    Show-Header -Title "ЗАВЕРШЕНИЕ МИГРАЦИИ ПРОФИЛЯ" -StepDescription "Шаг 1.5: Завершение процесса миграции"
     
     Write-LogAndConsole "Миграция профиля пользователя $UserName успешно завершена"
     Write-LogAndConsole "Исходное расположение профиля: C:\Users\$UserName (теперь символическая ссылка)"
@@ -539,25 +554,20 @@ function FinishOperation {
 }
 
 function MigrateUserProfile {
-    Clear-Host
-    Write-Host "================================================"
-    Write-Host "           МИГРАЦИЯ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ"
-    Write-Host "================================================"
+    Show-Header -Title "МИГРАЦИЯ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ" -StepDescription "Шаг 1: Мастер миграции профиля пользователя"
+    
+    Write-LogAndConsole "Это мастер поможет вам перенести профиль пользователя на другой диск"
+    Write-LogAndConsole "с сохранением доступа через символическую ссылку из исходного места."
     Write-Host ""
     
-    Write-LogAndConsole "*** Шаг 1: Выбор профиля пользователя ***"
     $userName = SelectUserProfile
     if ($null -eq $userName) { return }
     
-    Write-LogAndConsole "*** Шаг 2: Выбор целевого диска ***"
     $targetPath = SelectTargetDrive
     if ($null -eq $targetPath) { return }
     
-    Clear-Host
-    Write-Host "================================================"
-    Write-Host "          ПОДТВЕРЖДЕНИЕ МИГРАЦИИ"
-    Write-Host "================================================"
-    Write-Host ""
+    Show-Header -Title "ПОДТВЕРЖДЕНИЕ МИГРАЦИИ" -StepDescription "Проверка выбранных параметров"
+    
     Write-LogAndConsole "Параметры миграции:"
     Write-LogAndConsole "- ИСХОДНЫЙ профиль: C:\Users\$userName"
     Write-LogAndConsole "- ЦЕЛЕВОЕ расположение: $targetPath\$userName"
@@ -579,14 +589,14 @@ function MigrateUserProfile {
 }
 
 function ManageAdminAccount {
+    Show-Header -Title "УПРАВЛЕНИЕ УЧЕТНОЙ ЗАПИСЬЮ АДМИНИСТРАТОРА" -StepDescription "Управление встроенной учетной записью администратора"
+    
     $adminName = GetBuiltInAdminName
     
     try {
         $adminAccount = Get-LocalUser -Name $adminName
         $status = if ($adminAccount.Enabled) { "Включена" } else { "Отключена" }
         
-        Write-Host ""
-        Write-LogAndConsole "Управление встроенной учетной записью администратора"
         Write-LogAndConsole "Имя учетной записи: $adminName"
         Write-LogAndConsole "Текущий статус: $status"
         
@@ -610,16 +620,13 @@ function ManageAdminAccount {
 }
 
 function SwitchToAdminAccount {
+    Show-Header -Title "МИГРАЦИЯ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ WINDOWS" -StepDescription "Проверка необходимых разрешений"
+    
     $adminName = GetBuiltInAdminName
     
     try {
         $adminAccount = Get-LocalUser -Name $adminName
         
-        Write-Host ""
-        Write-Host "================================================"
-        Write-Host "          МИГРАЦИЯ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ WINDOWS"
-        Write-Host "================================================"
-        Write-Host ""
         Write-LogAndConsole "Этот скрипт позволяет перенести профиль пользователя на другой диск"
         Write-LogAndConsole "и создать символическую ссылку для бесшовной работы системы."
         Write-Host ""
@@ -681,11 +688,8 @@ function ShowAdminMenu {
     $continue = $true
     
     while ($continue) {
-        Clear-Host
-        Write-Host "================================================"
-        Write-Host "          МИГРАЦИЯ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ WINDOWS"
-        Write-Host "================================================"
-        Write-Host ""
+        Show-Header -Title "МИГРАЦИЯ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ WINDOWS" -StepDescription "Главное меню (режим администратора)"
+        
         Write-Host "Текущий пользователь: $env:USERNAME"
         Write-Host ""
         Write-Host "1. Начать миграцию профиля пользователя"
